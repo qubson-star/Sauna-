@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Patologiczny Skład na Saunach w Józefowie — 3D</title>
+<style>
+  :root{--night:#0a0f22;--sod:#ff9f2e;--acid:#c9ff3d;--pizda:#ff2d55;--ink:#e8dcc4}
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#0a0f22;font-family:"Arial Black",Impact,system-ui,sans-serif;color:var(--ink)}
+  #app{position:fixed;inset:0} canvas{display:block}
+  #caps{position:fixed;inset:0;pointer-events:none;z-index:5}
+  #meme{position:absolute;top:5%;left:50%;transform:translateX(-50%);width:94%;text-align:center;letter-spacing:.6px;line-height:1.0;
+    font-family:"Arial Black",Impact,sans-serif;text-transform:uppercase;font-size:clamp(18px,5vw,48px);color:#fff;
+    text-shadow:0 0 4px #000,3px 3px 0 #000,-2px 3px 0 #000,0 0 18px rgba(255,26,110,.7);opacity:0;transition:opacity .4s}
+  #meme .acid{color:var(--acid)} #meme .pizda{color:var(--pizda)}
+  #prose{position:absolute;bottom:13%;left:50%;transform:translate(-50%,0);width:min(700px,92%);text-align:center;
+    font-family:Georgia,serif;font-style:italic;font-size:clamp(13px,2.3vw,18px);color:#e8dcc4;text-shadow:0 2px 8px rgba(0,0,0,.9);opacity:0;transition:opacity .5s}
+  #dialog{position:absolute;bottom:23%;left:50%;transform:translate(-50%,0);width:min(660px,90%);text-align:center;
+    font-family:Georgia,serif;font-size:clamp(13px,2.2vw,18px);color:#f5e8c7;text-shadow:0 2px 6px rgba(0,0,0,.95);opacity:0;transition:opacity .35s}
+  #dialog b{font-family:"Arial Black",sans-serif;font-size:.8em;letter-spacing:.4px}
+  #dialog.m b{color:#7fd6ff} #dialog.f b{color:var(--pizda)}
+  .show{opacity:1!important}
+  #hud{position:fixed;top:12px;left:16px;z-index:6}
+  #hud .eyebrow{font:600 11px/1 system-ui;letter-spacing:3px;color:var(--sod);text-transform:uppercase}
+  #hud .ttl{font-family:Georgia,serif;font-style:italic;font-size:14px;color:#cfc6b2;margin-top:4px}
+  #bar{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:6;display:flex;gap:5px}
+  .seg{width:34px;height:3.5px;border-radius:2px;background:rgba(255,255,255,.15)}
+  .seg i{display:block;height:100%;width:0;background:var(--sod);transition:width .2s}
+  #ctrl{position:fixed;bottom:12px;right:16px;z-index:6;display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+  #ctrl button{font:700 11px/1 system-ui;letter-spacing:.4px;color:#10131c;background:#e8dcc4;border:0;border-radius:999px;padding:8px 13px;cursor:pointer}
+  #ctrl button:hover{transform:translateY(-1px)}
+  #hint{position:fixed;bottom:42px;right:16px;z-index:6;font:500 10px/1 system-ui;color:#8a8fa0;text-align:right}
+  #load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:9;background:#0a0f22;font:700 13px/1 system-ui;letter-spacing:2px;color:var(--sod)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="load">ŁADOWANIE SAUN W JÓZEFOWIE…</div>
+
+<div id="caps">
+  <div id="meme"></div>
+  <div id="dialog"></div>
+  <div id="prose"></div>
+</div>
+
+<div id="hud">
+  <div class="eyebrow">Patolog Skład</div>
+  <div class="ttl">Sauny „Zdrowo Nagrzani” • Józefów • Rzeka Świder</div>
+</div>
+
+<div id="bar"></div>
+<div id="hint">przeciągnij = obracaj • scroll = zoom • klikaj postacie</div>
+<div id="ctrl">
+  <button id="btnVoice">🔇 Głosy</button>
+  <button id="btnPlay">⏸ Pauza</button>
+  <button id="btnReplay">↻ Od nowa</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+function showFatal(msg){const l=document.getElementById('load');if(l){l.style.display='flex';l.style.whiteSpace='pre-wrap';l.style.padding='16px';l.style.fontSize='11px';l.style.color='#ff7b7b';l.textContent='BŁĄD:\n'+msg;}}
+window.addEventListener('error',e=>showFatal(e.message+' @'+e.lineno));
+window.addEventListener('unhandledrejection',e=>showFatal('Promise: '+(e.reason?.message||e.reason)));
+
+function boot(){
+try{
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x87ceeb);
+scene.fog=new THREE.Fog(0x87ceeb,25,70);
+
+const camera=new THREE.PerspectiveCamera(52,innerWidth/innerHeight,0.1,250);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+document.getElementById('app').appendChild(renderer.domElement);
+
+/* Światło */
+scene.add(new THREE.HemisphereLight(0x87ceeb,0x2d5a2d,0.75));
+const sun=new THREE.DirectionalLight(0xfff5d0,1.1);
+sun.position.set(18,35,-12);
+sun.castShadow=true;
+sun.shadow.mapSize.set(1024,1024);
+sun.shadow.camera.left=-35;sun.shadow.camera.right=35;sun.shadow.camera.top=35;sun.shadow.camera.bottom=-35;
+scene.add(sun);
+
+/* Czerwony domek sauny (fiński klimat) */
+function createSauna(){
+  const g=new THREE.Group();
+  const red=new THREE.MeshStandardMaterial({color:0xc0392b,roughness:0.7});
+  const white=new THREE.MeshStandardMaterial({color:0xf5f0e6,roughness:0.6});
+  
+  // Główny budynek
+  const body=new THREE.Mesh(new THREE.BoxGeometry(8,4.5,6),red);
+  body.position.y=2.25; body.castShadow=true; g.add(body);
+  
+  // Dach
+  const roof=new THREE.Mesh(new THREE.ConeGeometry(5.5,2.2,4),white);
+  roof.position.y=5.6; roof.rotation.y=Math.PI/4; roof.castShadow=true; g.add(roof);
+  
+  // Białe detale
+  const trim1=new THREE.Mesh(new THREE.BoxGeometry(8.2,0.4,6.2),white);
+  trim1.position.y=4.6; g.add(trim1);
+  
+  // Drzwi
+  const door=new THREE.Mesh(new THREE.BoxGeometry(1.4,2.8,0.2),new THREE.MeshStandardMaterial({color:0x3a2a1f}));
+  door.position.set(0,1.4,3.1); g.add(door);
+  
+  // Okna
+  for(let x of [-2.5,2.5]){
+    const win=new THREE.Mesh(new THREE.BoxGeometry(1.2,1.4,0.15),new THREE.MeshStandardMaterial({color:0xaad4ff,emissive:0x4488cc,emissiveIntensity:0.2}));
+    win.position.set(x,2.8,3.05); g.add(win);
+  }
+  
+  g.position.set(0,0,-8);
+  return g;
+}
+scene.add(createSauna());
+
+/* Las */
+function createTree(x,z,s=1){
+  const g=new THREE.Group();
+  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.25*s,0.35*s,3.5*s,7),new THREE.MeshStandardMaterial({color:0x5c4033}));
+  trunk.position.y=1.75*s; trunk.castShadow=true; g.add(trunk);
+  
+  const foliage=new THREE.Mesh(new THREE.SphereGeometry(1.8*s,9,9),new THREE.MeshStandardMaterial({color:0x1e4d2b,roughness:0.85}));
+  foliage.position.y=4.2*s; foliage.castShadow=true; g.add(foliage);
+  
+  const f2=new THREE.Mesh(new THREE.SphereGeometry(1.4*s,8,8),new THREE.MeshStandardMaterial({color:0x2d5a2d}));
+  f2.position.set(0.6*s,3.8*s,0.4*s); g.add(f2);
+  
+  g.position.set(x,0,z);
+  return g;
+}
+for(let i=0;i<9;i++){
+  scene.add(createTree(-18+Math.random()*8, -4+Math.random()*22, 0.9+Math.random()*0.4));
+  scene.add(createTree(12+Math.random()*7, -6+Math.random()*20, 0.85+Math.random()*0.5));
+}
+
+/* Rzeka Świder */
+const river=new THREE.Mesh(
+  new THREE.PlaneGeometry(55,18),
+  new THREE.MeshStandardMaterial({color:0x4a90c2,roughness:0.3,metalness:0.1})
+);
+river.rotation.x=-Math.PI/2;
+river.position.set(0,0.1,18);
+river.receiveShadow=true;
+scene.add(river);
+
+// Lekkie fale na rzece
+const waveGeo=new THREE.PlaneGeometry(50,14,40,8);
+const waveMat=new THREE.MeshStandardMaterial({color:0x5aa3d9,transparent:true,opacity:0.35,roughness:0.2});
+const waves=new THREE.Mesh(waveGeo,waveMat);
+waves.rotation.x=-Math.PI/2;
+waves.position.set(0,0.25,18);
+scene.add(waves);
+
+/* Ławki i taras sauny */
+const benchMat=new THREE.MeshStandardMaterial({color:0x8B5A2B,roughness:0.6});
+for(let i=0;i<4;i++){
+  const b=new THREE.Mesh(new THREE.BoxGeometry(2.4,0.12,0.55),benchMat);
+  b.position.set(-6+i*4,0.55,-3.5);
+  b.castShadow=true;
+  scene.add(b);
+}
+
+/* Postacie */
+function makeGuy(color, name, isFancy=false){
+  const g=new THREE.Group();
+  const torso=new THREE.Mesh(new THREE.CylinderGeometry(0.38,0.32,1.05,8),new THREE.MeshStandardMaterial({color,roughness:0.65}));
+  torso.position.y=1.25; torso.castShadow=true; g.add(torso);
+  
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.27,10,10),new THREE.MeshStandardMaterial({color:0xf0c8a0}));
+  head.position.y=1.95; head.castShadow=true; g.add(head);
+  
+  // Włosy / styl
+  if(isFancy){
+    const hair=new THREE.Mesh(new THREE.SphereGeometry(0.29,9,9),new THREE.MeshStandardMaterial({color:0x222222}));
+    hair.position.y=2.05; g.add(hair);
+  }
+  
+  const armL=new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.11,0.75,6),new THREE.MeshStandardMaterial({color}));
+  armL.position.set(-0.48,1.45,0); armL.rotation.z=0.4; armL.castShadow=true; g.add(armL);
+  const armR=armL.clone(); armR.position.x=0.48; armR.rotation.z=-0.4; g.add(armR);
+  
+  const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.13,0.85,6),new THREE.MeshStandardMaterial({color:0x222a3a}));
+  leg.position.set(-0.18,0.42,0); leg.castShadow=true; g.add(leg);
+  const legR=leg.clone(); legR.position.x=0.18; g.add(legR);
+  
+  g.userData={name, armL, armR, legL:leg, legR};
+  return g;
+}
+
+const pawel=makeGuy(0x2d5a7a,"Paweł",true); // gejowski gorpcore UX
+pawel.position.set(-3.5,0,-1.5); scene.add(pawel);
+
+const maciek=makeGuy(0x4a3f2e,"Maciek"); // intelektualista architekt
+maciek.position.set(1.5,0,-2); scene.add(maciek);
+
+const kubson=makeGuy(0xc45c2e,"Kubson"); // król życia
+kubson.position.set(5,0,-1); scene.add(kubson);
+
+// Proste animacje
+function idle(p,t){
+  p.rotation.y=Math.sin(t*0.6)*0.08;
+  p.userData.armL.rotation.z=0.4+Math.sin(t*1.1)*0.15;
+  p.userData.armR.rotation.z=-0.4-Math.sin(t*1.1)*0.15;
+}
+function talk(p,t){
+  idle(p,t);
+  p.userData.armR.rotation.z=-0.9+Math.sin(t*5)*0.35;
+}
+function runToRiver(p,t,progress){
+  p.position.z=-1.5 + progress*18;
+  p.position.x += Math.sin(t*3)*0.08;
+  p.rotation.y=Math.PI*0.5 + Math.sin(t*2)*0.2;
+  p.userData.armL.rotation.z=1.2+Math.sin(t*4)*0.4;
+  p.userData.armR.rotation.z=-1.2-Math.sin(t*4)*0.4;
+}
+
+/* Overlaye */
+const memeEl=document.getElementById('meme');
+const proseEl=document.getElementById('prose');
+const dialogEl=document.getElementById('dialog');
+const barEl=document.getElementById('bar');
+
+const beats=[
+  {t:0, meme:'PATOLOGICZNY SKŁAD<br><span class="acid">NA SAUNACH W JÓZEFOWIE</span>', prose:'Czerwony domek. Fiński klimat. Las i rzeka Świder. Czas się wygrzać i wyskoczyć.'},
+  {t:7, meme:'WYBIEGAMY Z SAUNY', prose:'Para, pot, endorfiny. Trzech chłopaków i jeden król życia.'},
+  {t:14, meme:'DO RZEKI KURWA', prose:'Na waleta. Do zimnej wody. Klasyka.'},
+  {t:21, meme:'RŻNIJMY TEN WIECZÓR', prose:'Po saunie zawsze jest lepiej. Szczególnie jak się jest w składzie.'},
+];
+
+let curBeat=-1;
+function setBeat(i){
+  if(i===curBeat)return; curBeat=i;
+  const b=beats[i];
+  memeEl.classList.remove('show'); proseEl.classList.remove('show');
+  setTimeout(()=>{memeEl.innerHTML=b.meme; proseEl.textContent=b.prose; memeEl.classList.add('show'); proseEl.classList.add('show');},160);
+}
+
+beats.forEach(()=>{const s=document.createElement('div');s.className='seg';const i=document.createElement('i');s.appendChild(i);barEl.appendChild(s);});
+
+/* Dialogi — mięsiste i zajebiste */
+const lines=[
+  {t:4, who:'Paweł', g:'m', txt:'Kurwa, ta sauna to jest pojebane. Czerwony domek, biały detal, fiński klimat... zaraz tu będzie śmierdziało spermą i piwem.'},
+  {t:8.5, who:'Maciek', g:'m', txt:'Architektonicznie to jest zajebiste. Ale jak wskoczymy do Świderka to cała ta elegancja pójdzie w pizdu.'},
+  {t:13, who:'Kubson', g:'m', txt:'Chłopaki, ja tu jestem królem życia. Wybiegamy na waleta i rżniemy rzekę. Kto ostatni w wodzie — ssie fiuta!'},
+  {t:18, who:'Paweł', g:'m', txt:'Ja pierdolę, woda jest zimna jak dupa pingwina. Ale po tej saunie to jest właśnie to, kurwa.'},
+  {t:23, who:'Maciek', g:'m', txt:'Czuję jak mi się mózg resetuje. I jednocześnie chce mi się rżnąć kogoś na brzegu.'},
+  {t:27, who:'Kubson', g:'m', txt:'Skład w komplecie, pizdy. Sauna + rzeka + my = idealny wieczór. Rżnijmy to do końca.'},
+];
+
+let firedTo=-1, dialogHideAt=0, curSpeaker=null, prevT=0, capToken=0, lastLine=null;
+
+function renderCaption(l){
+  dialogEl.className=''; dialogEl.classList.add(l.g);
+  dialogEl.innerHTML=`<b>${l.who}:</b> „${l.txt}”`;
+  dialogEl.classList.add('show'); curSpeaker=l.who;
+}
+function hideDialog(){dialogEl.classList.remove('show'); curSpeaker=null;}
+
+const ttsOK='speechSynthesis'in window;
+let voiceOn=false, vMale=null, vFemale=null;
+
+function loadVoices(){if(!ttsOK)return; const vs=speechSynthesis.getVoices(); const pl=vs.filter(v=>/^pl/i.test(v.lang));
+  vFemale=pl.find(v=>/kobie|female|paulina|zofia/i.test(v.name))||pl[0]||null;
+  vMale=pl.find(v=>v!==vFemale)||pl[1]||pl[0]||null;
+}
+if(ttsOK){loadVoices(); speechSynthesis.onvoiceschanged=loadVoices;}
+
+function speak(txt,g){if(!voiceOn||!ttsOK||!txt)return;
+  const u=new SpeechSynthesisUtterance(txt); u.lang='pl-PL';
+  if(g==='f'){if(vFemale)u.voice=vFemale; u.pitch=1.32; u.rate=1.01;}else{if(vMale)u.voice=vMale; u.pitch=0.82; u.rate=0.95;}
+  speechSynthesis.speak(u);
+}
+
+document.getElementById('btnVoice').onclick=function(){
+  if(!ttsOK){this.textContent='✕ brak TTS';this.disabled=true;return;}
+  voiceOn=!voiceOn; this.textContent=voiceOn?'🔊 Głosy':'🔇 Głosy';
+  if(voiceOn){loadVoices(); try{speechSynthesis.resume();}catch(e){} if(lastLine)speak(lastLine.txt,lastLine.g);}else{speechSynthesis.cancel();}
+};
+
+let playing=true, story=0;
+
+document.getElementById('btnPlay').onclick=function(){playing=!playing; this.textContent=playing?'⏸ Pauza':'▶ Graj'; if(!playing&&ttsOK)speechSynthesis.cancel();};
+document.getElementById('btnReplay').onclick=function(){if(ttsOK)speechSynthesis.cancel(); story=0; prevT=0; curBeat=-1; firedTo=-1; capToken++; hideDialog();
+  pawel.position.set(-3.5,0,-1.5); maciek.position.set(1.5,0,-2); kubson.position.set(5,0,-1); manual=false;};
+
+let manual=false, autoTimer=0, drag=false, px=0, py=0;
+const cv=renderer.domElement;
+cv.addEventListener('pointerdown',e=>{drag=true;manual=true;autoTimer=0;px=e.clientX;py=e.clientY;});
+addEventListener('pointermove',e=>{if(!drag)return; const o=window.orbit||{az:0.6,el:0.38,rad:19}; o.az-=(e.clientX-px)*0.0055; o.el=Math.max(0.12,Math.min(1.25,o.el-(e.clientY-py)*0.0045)); px=e.clientX;py=e.clientY; window.orbit=o;});
+addEventListener('pointerup',()=>drag=false);
+cv.addEventListener('wheel',e=>{e.preventDefault(); manual=true;autoTimer=0; const o=window.orbit||{rad:19}; o.rad=Math.max(7,Math.min(38,o.rad+e.deltaY*0.025)); window.orbit=o;},{passive:false});
+
+function updateCamera(dt){
+  const o=window.orbit||{az:0.6,el:0.38,rad:19,tx:0,ty:4,tz:6}; window.orbit=o;
+  if(manual){autoTimer+=dt;if(autoTimer>4.5)manual=false;}
+  if(!manual){o.az+=dt*0.035; o.el+=(0.42-o.el)*dt*0.5; o.rad+=(19-o.rad)*dt*0.6; o.tx+=(0-o.tx)*dt*0.5; o.tz+=(6-o.tz)*dt*0.5;}
+  const r=o.rad;
+  camera.position.set(o.tx+Math.cos(o.az)*Math.cos(o.el)*r, o.ty+Math.sin(o.el)*r*0.75, o.tz+Math.sin(o.az)*Math.cos(o.el)*r);
+  camera.lookAt(o.tx,o.ty+2,o.tz);
+}
+
+/* Główna pętla */
+const clock=new THREE.Clock();
+let prevTLoop=0;
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),0.055);
+  if(playing) story=(story+dt)%30;
+  const t=story;
+  
+  if(t<prevTLoop){firedTo=-1;capToken++;hideDialog();if(voiceOn&&ttsOK)speechSynthesis.cancel();}
+  prevTLoop=t;
+  
+  // Beaty
+  let bi=0; for(let i=0;i<beats.length;i++)if(t>=beats[i].t)bi=i; setBeat(bi);
+  beats.forEach((b,i)=>{const a=b.t; const bb=(i+1<beats.length)?beats[i+1].t:30; const pct=t>=bb?100:t<a?0:((t-a)/(bb-a))*100; barEl.children[i].firstChild.style.width=pct+'%';});
+  
+  // Dialogi
+  for(let i=firedTo+1;i<lines.length;i++){
+    if(t>=lines[i].t){
+      lastLine=lines[i];
+      if(voiceOn&&ttsOK){speak(lines[i].txt,lines[i].g); setTimeout(()=>{if(capToken===capToken)renderCaption(lines[i]);},180);} 
+      else{renderCaption(lines[i]); dialogHideAt=t+Math.max(3.2,lines[i].txt.length*0.075);}
+      firedTo=i;
+    }else break;
+  }
+  if(curSpeaker&&!voiceOn&&t>dialogHideAt)hideDialog();
+  
+  // Animacje
+  const tt=performance.now()*0.0015;
+  
+  // Paweł (gejowski UX) — stoi i gestykuluje
+  if(t<12) talk(pawel,tt);
+  else if(t>20) runToRiver(pawel,tt,Math.min(1,(t-20)/6));
+  else idle(pawel,tt);
+  
+  // Maciek — intelektualista
+  if(t<10) idle(maciek,tt*0.9);
+  else if(t>18) runToRiver(maciek,tt,Math.min(1,(t-18)/7));
+  else if(curSpeaker==='Maciek') talk(maciek,tt);
+  else idle(maciek,tt);
+  
+  // Kubson — król życia, zawsze w ruchu
+  if(t<14) {kubson.rotation.y=Math.sin(tt*1.2)*0.25; kubson.userData.armL.rotation.z=0.8+Math.sin(tt*3)*0.3; kubson.userData.armR.rotation.z=-0.8-Math.sin(tt*3)*0.3;}
+  else if(t>16) runToRiver(kubson,tt,Math.min(1,(t-16)/5.5));
+  else if(curSpeaker==='Kubson') talk(kubson,tt*1.3);
+  else idle(kubson,tt);
+  
+  // Fale na rzece
+  waves.position.y=0.2 + Math.sin(tt*1.8)*0.08;
+  
+  updateCamera(dt);
+  renderer.render(scene,camera);
+}
+
+/* Start */
+document.getElementById('load').style.display='none';
+window.orbit={az:0.6,el:0.38,rad:19,tx:0,ty:4,tz:6};
+animate();
+
+console.log('%c[Sauny Józefów] Patologiczny Skład — gotowe. Dialogi zajebiste.', 'color:#c9ff3d');
+
+}catch(err){showFatal((err&&err.message||err)+'\n'+(err&&err.stack||''));}
+}
+if(typeof THREE!=='undefined'){boot();}else{showFatal('Three.js nie wczytał się.');}
+</script>
+</body>
+</html>
