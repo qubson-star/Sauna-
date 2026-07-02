@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Patologiczny Skład pod Rotundą</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --noc:#07090f;
+    --neon:#ffd9a0;
+    --zabka:#37b34a;
+    --krew:#c0392b;
+    --papier:#e8e2d6;
+    --szary:#8a8fa0;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;overflow:hidden;background:var(--noc);}
+  body{font-family:'Fraunces',Georgia,serif;color:var(--papier);}
+  #scena{position:fixed;inset:0;}
+  canvas{display:block;}
+
+  /* winieta + ziarno */
+  #winieta{position:fixed;inset:0;pointer-events:none;z-index:5;
+    background:radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(0,0,0,.55) 100%);}
+  #ziarno{position:fixed;inset:0;pointer-events:none;z-index:6;opacity:.07;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");}
+
+  /* letterbox */
+  .pasek{position:fixed;left:0;right:0;height:9vh;background:#000;z-index:8;transition:transform 1.2s ease;}
+  #pasekGora{top:0;transform-origin:top;}
+  #pasekDol{bottom:0;transform-origin:bottom;}
+
+  /* tytuł w rogu */
+  #tytulRog{position:fixed;top:calc(9vh + 14px);left:18px;z-index:10;
+    font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.28em;
+    color:var(--szary);text-transform:uppercase;opacity:0;transition:opacity 1s;}
+  #tytulRog b{color:var(--neon);font-weight:700;}
+
+  /* przełącznik lektora */
+  #btnLektor{position:fixed;top:calc(9vh + 8px);right:18px;z-index:14;
+    font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--szary);background:transparent;
+    border:1px solid rgba(138,143,160,.4);padding:7px 14px;cursor:pointer;
+    transition:color .2s, border-color .2s;opacity:0;}
+  #btnLektor.widoczny{opacity:1;}
+  #btnLektor:hover{color:var(--neon);border-color:var(--neon);}
+  #btnLektor.wyciszony{color:#5a5e6d;text-decoration:line-through;}
+
+  /* motto na starcie */
+  #start .motto{font-style:italic;font-size:clamp(15px,2.4vw,21px);
+    color:var(--papier);opacity:.85;max-width:38ch;line-height:1.6;}
+
+  /* pasek narracji */
+  #narracja{position:fixed;left:0;right:0;bottom:0;z-index:12;
+    padding:20px 24px calc(9vh + 18px);display:flex;flex-direction:column;gap:10px;
+    background:linear-gradient(transparent, rgba(3,4,8,.92) 45%);
+    opacity:0;transform:translateY(12px);transition:opacity .5s, transform .5s;
+    pointer-events:none;}
+  #narracja.widoczna{opacity:1;transform:translateY(0);pointer-events:auto;}
+
+  #tagMem{font-family:'JetBrains Mono',monospace;font-weight:800;font-size:clamp(14px,2.4vw,20px);
+    letter-spacing:.14em;color:var(--noc);background:var(--neon);
+    display:inline-block;width:max-content;max-width:100%;padding:3px 10px;
+    box-shadow:4px 4px 0 rgba(0,0,0,.6);transform:rotate(-1.2deg);}
+  #tagMem.pusty{display:none;}
+  #tagMem.dialogowy{background:var(--krew);color:var(--papier);transform:rotate(.8deg);}
+
+  #tekstProza{font-size:clamp(17px,3vw,25px);line-height:1.45;max-width:760px;
+    text-shadow:0 2px 12px rgba(0,0,0,.9);}
+  #tekstProza.kwestia{font-style:italic;}
+  #tekstProza.kwestia::before{content:'\201E';color:var(--szary);}
+  #tekstProza.kwestia::after{content:'\201D';color:var(--szary);}
+
+  #dolnyRzad{display:flex;align-items:center;justify-content:space-between;max-width:760px;margin-top:2px;}
+  #kropki{display:flex;gap:7px;}
+  .kropka{width:7px;height:7px;border-radius:50%;background:rgba(232,226,214,.18);transition:background .3s, transform .3s;}
+  .kropka.aktywna{background:var(--neon);transform:scale(1.35);}
+  .kropka.dialog{border-radius:1px;}
+
+  #btnDalej{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--noc);background:var(--papier);
+    border:none;padding:10px 22px;cursor:pointer;transition:background .2s, transform .1s;}
+  #btnDalej:hover{background:var(--neon);}
+  #btnDalej:active{transform:translateY(1px);}
+  #btnDalej:focus-visible{outline:2px solid var(--neon);outline-offset:3px;}
+
+  /* ekran startowy */
+  #start{position:fixed;inset:0;z-index:20;background:var(--noc);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;
+    text-align:center;padding:24px;transition:opacity 1.2s;}
+  #start.znika{opacity:0;pointer-events:none;}
+  #start .nad{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.4em;
+    color:var(--szary);text-transform:uppercase;}
+  #start h1{font-size:clamp(34px,7vw,74px);font-weight:600;line-height:1.05;max-width:14ch;}
+  #start h1 em{font-style:italic;color:var(--neon);}
+  #start .pod{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--szary);
+    letter-spacing:.1em;max-width:44ch;line-height:1.8;}
+  #btnStart{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:800;
+    letter-spacing:.2em;text-transform:uppercase;color:var(--noc);background:var(--neon);
+    border:none;padding:16px 40px;cursor:pointer;box-shadow:6px 6px 0 rgba(192,57,43,.5);
+    transition:transform .12s, box-shadow .12s;}
+  #btnStart:hover{transform:translate(-2px,-2px);box-shadow:8px 8px 0 rgba(192,57,43,.6);}
+  #btnStart:focus-visible{outline:2px solid var(--papier);outline-offset:3px;}
+
+  /* finał */
+  #final{position:fixed;inset:0;z-index:18;background:rgba(3,4,8,0);pointer-events:none;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;
+    transition:background 2s;}
+  #final.widoczny{background:rgba(3,4,8,.9);pointer-events:auto;}
+  #final > *{opacity:0;transition:opacity 1.4s .8s;}
+  #final.widoczny > *{opacity:1;}
+  #final h2{font-size:clamp(26px,5vw,52px);font-weight:600;font-style:italic;text-align:center;max-width:16ch;}
+  #btnRestart{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;
+    letter-spacing:.18em;text-transform:uppercase;color:var(--papier);background:transparent;
+    border:1px solid var(--szary);padding:12px 28px;cursor:pointer;transition:border-color .2s,color .2s;}
+  #btnRestart:hover{border-color:var(--neon);color:var(--neon);}
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition-duration:.01s !important;}
+  }
+  @media (max-width:600px){
+    #narracja{padding-bottom:calc(7vh + 14px);}
+    .pasek{height:7vh;}
+    #tytulRog{top:calc(7vh + 10px);}
+  }
+</style>
+</head>
+<body>
+<div id="scena"></div>
+<div id="winieta"></div>
+<div id="ziarno"></div>
+<div class="pasek" id="pasekGora"></div>
+<div class="pasek" id="pasekDol"></div>
+
+<div id="tytulRog"><b>PATOLOGICZNY SKŁAD</b> / ROTUNDA / NOC</div>
+<button id="btnLektor">🔊 lektor</button>
+
+<div id="narracja">
+  <div id="tagMem" class="pusty"></div>
+  <div id="tekstProza"></div>
+  <div id="dolnyRzad">
+    <div id="kropki"></div>
+    <button id="btnDalej">Dalej →</button>
+  </div>
+</div>
+
+<div id="start">
+  <div class="nad">Warszawa · Rondo Dmowskiego · 02:47</div>
+  <h1>Patologiczny Skład <em>pod Rotundą</em></h1>
+  <div class="motto">Warszawska noc, paczka chłopaków i miasto, które udawało, że niczego nie pamięta.</div>
+  <div class="pod">proza interaktywna · wulgarny język · fikcja literacka<br>spacja lub klik przesuwa noc do przodu · lektor czyta na głos</div>
+  <button id="btnStart">Zaczynamy</button>
+</div>
+
+<div id="final">
+  <h2>Reszta nocy jest ich.</h2>
+  <button id="btnRestart">Jeszcze raz od Żabki</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+
+/* ============================================================
+   SCENARIUSZ — jedna tablica, jeden kontroler tekstu.
+   Prolog i dialogi NIE MOGĄ się nałożyć: każdy beat nadpisuje
+   poprzedni w tych samych elementach DOM.
+   ============================================================ */
+const BEATS = [
+  {typ:'proza', tag:'PROLOG', tekst:'Pod Rotundą człowiek nigdy nie był pierwszy. Nawet jeśli był pierwszy, to i tak miał wrażenie, że ktoś już tam przed nim stał od zawsze. Cień, plama, duch poprzedniego melanżu, pet zgnieciony w szczelinie chodnika.', kamera:'szeroki', akcja:'intro'},
+  {typ:'proza', tag:null, tekst:'Warszawa miała swoje świątynie, ale my nie chodziliśmy do kościołów. Nasze msze odbywały się pod neonami, przy kioskach, na ławkach, w przejściach podziemnych i na skarpie, gdzie drzewa udawały las, a miasto udawało, że nie patrzy.', kamera:'fin'},
+  {typ:'proza', tag:null, tekst:'Rondo. Noc. Rotunda jeszcze się świeci.', kamera:'szeroki'},
+  {typ:'proza', tag:null, tekst:'Najpierw przychodził Majkello. Majkello nie wchodził w wieczór. On go obejmował stanowiskiem. Miał w sobie coś z oficera aprowizacji i szamana niskich pobudek.', kamera:'zabka'},
+  {typ:'proza', tag:null, tekst:'Nadworny polewacz, minister płynów, człowiek od decyzji ostatecznych. Nie pytał, czy pijemy. Pytał, co pijemy i w jakiej kolejności, a w jego głosie było tyle demokracji, ile w komunikacie o stanie wojennym.', kamera:'zabka'},
+  {typ:'proza', tag:'FLASZKI ✓', tekst:'Majkello wychodzi z Żabki. Reklamówka ciągnie mu rękę do ziemi.', kamera:'zabka', akcja:'majkelloIdzie'},
+  {typ:'dialog', kto:'MAJKELLO', tekst:'Dobra, panowie, dzisiaj bez kombinowania.', kamera:'zblizenie', fokus:'majkello'},
+  {typ:'proza', tag:null, tekst:'Co oczywiście znaczyło, że kombinowanie zacznie się za siedem minut. Rozsądnie znaczyło u niego: tak, żeby dało się jeszcze przejść przez pasy, ale już niekoniecznie podjąć dobrą decyzję życiową.', kamera:'grupa'},
+  {typ:'proza', tag:'PO BIEGU TRZEBA POPIĆ', tekst:'Jerzy dobiega ostatnie metry. Okulary zaparowane, o czasie nie mówi nic.', kamera:'ulica', akcja:'jerzyBiegnie'},
+  {typ:'proza', tag:'DO PIZDY', tekst:'Beemer wtacza się od strony mostu. Staje na środku ronda, jakby go tu nie było.', kamera:'most', akcja:'beemer'},
+  {typ:'proza', tag:'ZACZYNA SIĘ', tekst:'Skład prawie w komplecie. Reszta nocy czeka.', kamera:'grupa', akcja:'zbiorka'},
+  {typ:'dialog', kto:'MAJKELLO', tekst:'Mam flaszki, kurwy jebane. Starczy do rana, żeby się tu rżnąć aż do świtu.', kamera:'zblizenie', fokus:'majkello'},
+  {typ:'dialog', kto:'MEJER', tekst:'Tylko nie pierdol, Majkello, że znowu samo piwo, ty chuju. Dawaj coś co pali w gardle jak fiut w dupie.', kamera:'zblizenie', fokus:'mejer'},
+  {typ:'dialog', kto:'JERZY', tekst:'Dobiłem dychę, pierdolę. Nalewaj, bo zaraz zdechnę z zimna, jebane mendy.', kamera:'zblizenie', fokus:'jerzy'},
+  {typ:'dialog', kto:'MAGDA', tekst:'Wysiadam, kurwa, i co? Stoicie jak na chujowym pogrzebie. Dawajcie flaszkę, bo zaraz was rozjebię.', kamera:'auto', fokus:'magda', akcja:'magdaWysiada'},
+  {typ:'dialog', kto:'MAGDA', tekst:'No to skład w komplecie, pizdy. Dawajcie rżnąć tę noc, bo rano już nie będzie po co wstawać.', kamera:'zblizenie', fokus:'magda', akcja:'magdaDolacza'},
+  {typ:'proza', tag:null, tekst:'Piją prosto z gwinta. Straż miejska śpi, miasto nie. Plan jest prosty: rżnąć tę noc do końca.', kamera:'fin', akcja:'toast'}
+];
+
+/* ============================================================
+   THREE.JS — scena
+   ============================================================ */
+const kontener = document.getElementById('scena');
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+renderer.outputEncoding = THREE.sRGBEncoding;
+kontener.appendChild(renderer.domElement);
+
+const scena = new THREE.Scene();
+scena.background = new THREE.Color(0x05070d);
+scena.fog = new THREE.FogExp2(0x070a12, 0.0085);
+
+const kamera = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, 0.1, 500);
+kamera.position.set(-22, 9, 38);
+const celKamery = new THREE.Vector3(6, 5, -8);
+
+/* ---------- światła bazowe ---------- */
+scena.add(new THREE.AmbientLight(0x24304a, 0.55));
+const ksiezyc = new THREE.DirectionalLight(0x4a5a7d, 0.35);
+ksiezyc.position.set(-40, 60, -20);
+scena.add(ksiezyc);
+const hemi = new THREE.HemisphereLight(0x2a3452, 0x0a0c12, 0.4);
+scena.add(hemi);
+
+/* ---------- pomocnicze tekstury ---------- */
+function teksturaGlow(kolor){
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(64,64,0,64,64,64);
+  grad.addColorStop(0, kolor); grad.addColorStop(0.35, kolor.replace(')',',0.45)').replace('rgb','rgba'));
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = grad; g.fillRect(0,0,128,128);
+  return new THREE.CanvasTexture(c);
+}
+const glowCieply = teksturaGlow('rgb(255,205,140)');
+const glowZimny  = teksturaGlow('rgb(180,210,255)');
+const glowZielony= teksturaGlow('rgb(90,220,110)');
+const glowCzerw  = teksturaGlow('rgb(255,60,50)');
+
+function sprajtGlow(tekstura, skala, x,y,z, opa){
+  const m = new THREE.SpriteMaterial({map:tekstura, transparent:true, opacity:opa||0.85,
+    blending:THREE.AdditiveBlending, depthWrite:false});
+  const s = new THREE.Sprite(m); s.scale.set(skala,skala,1); s.position.set(x,y,z);
+  return s;
+}
+
+function teksturaOkien(kol, rz, procent, cieple){
+  const c = document.createElement('canvas'); c.width = kol*14; c.height = rz*20;
+  const g = c.getContext('2d');
+  g.fillStyle = '#0c0f16'; g.fillRect(0,0,c.width,c.height);
+  for(let i=0;i<kol;i++) for(let j=0;j<rz;j++){
+    if(Math.random() < procent){
+      const cieplo = cieple ? (Math.random()<0.8) : (Math.random()<0.3);
+      g.fillStyle = cieplo ? `rgba(255,${190+Math.random()*40|0},${120+Math.random()*50|0},${0.55+Math.random()*0.45})`
+                           : `rgba(${150+Math.random()*40|0},${180+Math.random()*40|0},255,${0.3+Math.random()*0.4})`;
+      g.fillRect(i*14+2, j*20+3, 10, 13);
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  return t;
+}
+
+function teksturaNapis(tekst, kolorTla, kolorTekstu, szer, wys, font){
+  const c = document.createElement('canvas'); c.width = szer; c.height = wys;
+  const g = c.getContext('2d');
+  g.fillStyle = kolorTla; g.fillRect(0,0,szer,wys);
+  g.fillStyle = kolorTekstu;
+  g.font = font || `bold ${wys*0.6|0}px Arial`;
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(tekst, szer/2, wys/2 + wys*0.02);
+  return new THREE.CanvasTexture(c);
+}
+
+/* ---------- nawierzchnia: mokry asfalt ---------- */
+const asfalt = new THREE.Mesh(
+  new THREE.CircleGeometry(200, 48),
+  new THREE.MeshStandardMaterial({color:0x111318, roughness:0.32, metalness:0.25})
+);
+asfalt.rotation.x = -Math.PI/2;
+scena.add(asfalt);
+
+/* wyspa środkowa ronda */
+const wyspa = new THREE.Mesh(
+  new THREE.CylinderGeometry(9, 9.4, 0.35, 40),
+  new THREE.MeshStandardMaterial({color:0x1a1d24, roughness:0.7})
+);
+wyspa.position.y = 0.17;
+scena.add(wyspa);
+
+/* pasy na jezdni — kreski wokół ronda */
+const matPas = new THREE.MeshBasicMaterial({color:0x8a8fa0, transparent:true, opacity:0.35});
+for(let i=0;i<36;i++){
+  const a = i/36*Math.PI*2;
+  const pas = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 2.2), matPas);
+  pas.rotation.x = -Math.PI/2; pas.rotation.z = -a;
+  pas.position.set(Math.cos(a)*15.5, 0.02, Math.sin(a)*15.5);
+  scena.add(pas);
+}
+
+/* smugi odbić świateł na mokrym asfalcie */
+function smuga(x, z, kolorTex, dl, szer, opa){
+  const c = document.createElement('canvas'); c.width = 32; c.height = 256;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0,0,0,256);
+  grad.addColorStop(0, kolorTex); grad.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = grad;
+  g.fillRect(0,0,32,256);
+  const t = new THREE.CanvasTexture(c);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(szer, dl),
+    new THREE.MeshBasicMaterial({map:t, transparent:true, opacity:opa,
+      blending:THREE.AdditiveBlending, depthWrite:false}));
+  m.rotation.x = -Math.PI/2;
+  m.position.set(x, 0.03, z + dl/2);
+  scena.add(m);
+  return m;
+}
+
+/* ---------- ROTUNDA (PKO, Marszałkowska róg Jerozolimskich) ---------- */
+const rotunda = new THREE.Group();
+{
+  // szklany walec z ciepłymi oknami
+  const szklo = new THREE.Mesh(
+    new THREE.CylinderGeometry(13, 13, 9, 36, 1, false),
+    new THREE.MeshStandardMaterial({
+      map:(()=>{const t=teksturaOkien(36, 4, 0.85, true); t.wrapS=THREE.RepeatWrapping; return t;})(),
+      emissiveMap:(()=>{const t=teksturaOkien(36, 4, 0.85, true); t.wrapS=THREE.RepeatWrapping; return t;})(),
+      emissive:0xffc890, emissiveIntensity:0.9,
+      color:0x151820, roughness:0.15, metalness:0.6
+    })
+  );
+  szklo.position.y = 4.5;
+  rotunda.add(szklo);
+
+  // plisowana korona dachu — pierścień trójkątnych paneli
+  const korona = new THREE.Mesh(
+    new THREE.CylinderGeometry(14.6, 13.2, 2.6, 28, 1, false),
+    new THREE.MeshStandardMaterial({color:0x232833, roughness:0.55, metalness:0.5, flatShading:true})
+  );
+  korona.position.y = 10.3;
+  rotunda.add(korona);
+
+  // neonowy ring pod koroną
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(13.5, 0.14, 8, 64),
+    new THREE.MeshBasicMaterial({color:0xcfe4ff})
+  );
+  ring.rotation.x = Math.PI/2; ring.position.y = 9.1;
+  rotunda.add(ring);
+  rotunda.add(sprajtGlow(glowZimny, 34, 0, 9.1, 0, 0.5));
+
+  // logo PKO na fasadzie
+  const logo = new THREE.Mesh(
+    new THREE.PlaneGeometry(8, 2),
+    new THREE.MeshBasicMaterial({map:teksturaNapis('PKO', '#00264d', '#e8f0ff', 256, 64, 'bold 46px Arial'), transparent:false})
+  );
+  logo.position.set(0, 7.4, 13.15);
+  rotunda.add(logo);
+  rotunda.add(sprajtGlow(glowZimny, 9, 0, 7.4, 13.6, 0.5));
+
+  rotunda.position.set(30, 0, -26);
+  rotunda.lookAt(0, 0, 0);
+  scena.add(rotunda);
+
+  const swiatloRot = new THREE.PointLight(0xffc890, 1.4, 55, 2);
+  swiatloRot.position.set(24, 5, -18);
+  scena.add(swiatloRot);
+  smuga(24, -14, 'rgba(255,200,140,0.8)', 22, 5, 0.32);
+}
+
+/* ---------- ŻABKA ---------- */
+const zabka = new THREE.Group();
+{
+  const bud = new THREE.Mesh(
+    new THREE.BoxGeometry(9, 3.6, 6),
+    new THREE.MeshStandardMaterial({color:0x1c1f27, roughness:0.8})
+  );
+  bud.position.y = 1.8;
+  zabka.add(bud);
+
+  // świecąca witryna
+  const witryna = new THREE.Mesh(
+    new THREE.PlaneGeometry(7.6, 2.4),
+    new THREE.MeshBasicMaterial({color:0xfff3d6})
+  );
+  witryna.position.set(0, 1.5, 3.02);
+  zabka.add(witryna);
+
+  // szyld
+  const szyld = new THREE.Mesh(
+    new THREE.PlaneGeometry(6, 1.1),
+    new THREE.MeshBasicMaterial({map:teksturaNapis('Żabka', '#1c8a34', '#ffffff', 256, 48, 'bold 34px Arial')})
+  );
+  szyld.position.set(0, 3.15, 3.05);
+  zabka.add(szyld);
+  zabka.add(sprajtGlow(glowZielony, 10, 0, 3.1, 3.6, 0.55));
+
+  zabka.position.set(-30, 0, 6);
+  zabka.rotation.y = Math.PI/2.4;
+  scena.add(zabka);
+
+  const swZ = new THREE.PointLight(0xd9ffdf, 1.0, 26, 2);
+  swZ.position.set(-26.5, 2, 9);
+  scena.add(swZ);
+  smuga(-26, 9, 'rgba(120,230,140,0.7)', 14, 3.4, 0.3);
+}
+
+/* ---------- PKiN w tle (zachód) ---------- */
+{
+  const matPkin = new THREE.MeshStandardMaterial({
+    color:0x11141c, roughness:0.9,
+    emissiveMap:teksturaOkien(10, 30, 0.12, false), emissive:0x99bbee, emissiveIntensity:0.5,
+    map:teksturaOkien(10, 30, 0.12, false)
+  });
+  const baza  = new THREE.Mesh(new THREE.BoxGeometry(46, 24, 46), matPkin); baza.position.set(-120, 12, -70);
+  const srodek= new THREE.Mesh(new THREE.BoxGeometry(28, 34, 28), matPkin); srodek.position.set(-120, 41, -70);
+  const wieza = new THREE.Mesh(new THREE.BoxGeometry(14, 30, 14), matPkin); wieza.position.set(-120, 73, -70);
+  const iglica= new THREE.Mesh(new THREE.ConeGeometry(2.2, 26, 8),
+    new THREE.MeshStandardMaterial({color:0x1a1e28, roughness:0.8}));
+  iglica.position.set(-120, 101, -70);
+  scena.add(baza, srodek, wieza, iglica);
+  scena.add(sprajtGlow(glowCzerw, 5, -120, 114.5, -70, 0.8));
+}
+
+/* ---------- panorama: ciemne kamienice z rzadkimi oknami ---------- */
+const rngBud = [ [55,-60,26,18], [80,-30,20,26], [70,20,24,20], [50,55,30,16],
+                 [-60,-55,22,20], [-15,-85,34,22], [15,-80,26,24], [-75,45,24,18] ];
+rngBud.forEach(function(b){
+  const m = new THREE.Mesh(
+    new THREE.BoxGeometry(b[3], b[2], b[3]),
+    new THREE.MeshStandardMaterial({
+      color:0x0d1017, roughness:0.95,
+      map:teksturaOkien(6, 12, 0.14, true),
+      emissiveMap:teksturaOkien(6, 12, 0.14, true),
+      emissive:0xffcf9a, emissiveIntensity:0.55
+    })
+  );
+  m.position.set(b[0], b[2]/2, b[1]);
+  m.rotation.y = Math.random()*0.8;
+  scena.add(m);
+});
+
+/* ---------- latarnie ---------- */
+const latarnie = [];
+[[ -14, 20],[ 16, 18],[ 22, -8],[ -20, -12],[ 2, 26],[ -2, -22]].forEach(function(p){
+  const g = new THREE.Group();
+  const slup = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 7, 8),
+    new THREE.MeshStandardMaterial({color:0x2a2e38, roughness:0.6, metalness:0.7}));
+  slup.position.y = 3.5; g.add(slup);
+  const glowa = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8),
+    new THREE.MeshBasicMaterial({color:0xffd9a0}));
+  glowa.position.y = 7; g.add(glowa);
+  g.add(sprajtGlow(glowCieply, 6.5, 0, 7, 0, 0.75));
+  const sw = new THREE.PointLight(0xffc27a, 1.1, 26, 2);
+  sw.position.y = 6.8; g.add(sw);
+  g.position.set(p[0], 0, p[1]);
+  scena.add(g);
+  smuga(p[0], p[1]-1, 'rgba(255,195,125,0.75)', 11, 1.6, 0.35);
+  latarnie.push(g);
+});
+
+/* ---------- deszcz (LineSegments) ---------- */
+const ILE_KROPLI = 700;
+const pozDeszcz = new Float32Array(ILE_KROPLI*6);
+for(let i=0;i<ILE_KROPLI;i++){
+  const x = (Math.random()-0.5)*130, y = Math.random()*45, z = (Math.random()-0.5)*130;
+  pozDeszcz[i*6]=x;   pozDeszcz[i*6+1]=y;     pozDeszcz[i*6+2]=z;
+  pozDeszcz[i*6+3]=x; pozDeszcz[i*6+4]=y-0.8; pozDeszcz[i*6+5]=z;
+}
+const geoDeszcz = new THREE.BufferGeometry();
+geoDeszcz.setAttribute('position', new THREE.BufferAttribute(pozDeszcz, 3));
+const deszcz = new THREE.LineSegments(geoDeszcz,
+  new THREE.LineBasicMaterial({color:0x9db0d0, transparent:true, opacity:0.22,
+    blending:THREE.AdditiveBlending, depthWrite:false}));
+scena.add(deszcz);
+
+/* ---------- BEEMER ---------- */
+const beemer = new THREE.Group();
+{
+  const lakier = new THREE.MeshStandardMaterial({color:0x0e1420, roughness:0.2, metalness:0.9});
+  const nadwozie = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.7, 4.6), lakier);
+  nadwozie.position.y = 0.65; beemer.add(nadwozie);
+  const kabina = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.55, 2.4),
+    new THREE.MeshStandardMaterial({color:0x05070c, roughness:0.1, metalness:0.9}));
+  kabina.position.set(0, 1.25, -0.2); beemer.add(kabina);
+  const matKolo = new THREE.MeshStandardMaterial({color:0x08090c, roughness:0.9});
+  [[-1.05,1.5],[1.05,1.5],[-1.05,-1.5],[1.05,-1.5]].forEach(function(k){
+    const kolo = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 16), matKolo);
+    kolo.rotation.z = Math.PI/2; kolo.position.set(k[0], 0.42, k[1]);
+    beemer.add(kolo);
+  });
+  // przednie światła (przód = -z)
+  [-0.7, 0.7].forEach(function(x){
+    beemer.add(sprajtGlow(glowZimny, 2.4, x, 0.7, -2.35, 0.95));
+    const refl = new THREE.SpotLight(0xdfeaff, 2.2, 30, 0.5, 0.5, 1.5);
+    refl.position.set(x, 0.75, -2.2);
+    const cel = new THREE.Object3D(); cel.position.set(x, 0.2, -12);
+    beemer.add(cel); refl.target = cel; beemer.add(refl);
+  });
+  // tylne
+  [-0.75, 0.75].forEach(function(x){
+    beemer.add(sprajtGlow(glowCzerw, 1.5, x, 0.75, 2.35, 0.9));
+  });
+  // cień pod autem
+  const cien = new THREE.Mesh(new THREE.CircleGeometry(2.6, 20),
+    new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:0.5}));
+  cien.rotation.x = -Math.PI/2; cien.position.y = 0.015; cien.scale.set(0.55,1,1);
+  beemer.add(cien);
+
+  beemer.position.set(2, 0, 85);
+  beemer.visible = false;
+  scena.add(beemer);
+}
+
+/* ---------- POSTACIE ---------- */
+function postac(kolorKurtki, opcje){
+  opcje = opcje || {};
+  const g = new THREE.Group();
+  const matKurtka = new THREE.MeshStandardMaterial({color:kolorKurtki, roughness:0.85});
+  const matSpodnie = new THREE.MeshStandardMaterial({color:0x14161c, roughness:0.9});
+  const matSkora = new THREE.MeshStandardMaterial({color:0xc9a184, roughness:0.7});
+
+  const nogi = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.85, 10), matSpodnie);
+  nogi.position.y = 0.42; g.add(nogi);
+  const tors = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.3, 0.9, 10), matKurtka);
+  tors.position.y = 1.3; g.add(tors);
+  const glowa = new THREE.Mesh(new THREE.SphereGeometry(0.26, 14, 12), matSkora);
+  glowa.position.y = 2.05; g.add(glowa);
+  if(opcje.kaptur){
+    const kaptur = new THREE.Mesh(new THREE.SphereGeometry(0.31, 12, 10, 0, Math.PI*2, 0, Math.PI/1.7), matKurtka);
+    kaptur.position.y = 2.1; g.add(kaptur);
+  }
+  if(opcje.wlosy){
+    const wlosy = new THREE.Mesh(new THREE.SphereGeometry(0.29, 12, 10),
+      new THREE.MeshStandardMaterial({color:0x2b1d12, roughness:0.95}));
+    wlosy.position.y = 2.14; wlosy.scale.set(1, 0.95, 1); g.add(wlosy);
+    const kucyk = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.05, 0.55, 8),
+      new THREE.MeshStandardMaterial({color:0x2b1d12, roughness:0.95}));
+    kucyk.position.set(0, 1.85, 0.28); kucyk.rotation.x = 0.5; g.add(kucyk);
+  }
+  if(opcje.okulary){
+    const oku = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.09, 0.06),
+      new THREE.MeshBasicMaterial({color:0xbfd4ee}));
+    oku.position.set(0, 2.08, 0.24); g.add(oku);
+  }
+  if(opcje.reklamowka){
+    const torba = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.5, 0.28),
+      new THREE.MeshStandardMaterial({color:0xf2f2f2, roughness:0.6}));
+    torba.position.set(0.5, 0.75, 0); g.add(torba);
+  }
+  // blob-cień
+  const cien = new THREE.Mesh(new THREE.CircleGeometry(0.55, 16),
+    new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:0.45}));
+  cien.rotation.x = -Math.PI/2; cien.position.y = 0.012;
+  g.add(cien);
+
+  g.userData = {faza:Math.random()*6, tempo:1, mowi:false};
+  return g;
+}
+
+const majkello = postac(0x39424f, {kaptur:true, reklamowka:true});
+majkello.position.set(-26, 0, 9); majkello.visible = false; scena.add(majkello);
+
+const jerzy = postac(0x8a3038, {okulary:true});
+jerzy.position.set(46, 0, 16); jerzy.visible = false; scena.add(jerzy);
+
+const mejer = postac(0x23282f, {kaptur:true});
+mejer.position.set(-1.6, 0, 3.4); mejer.rotation.y = 0.5; scena.add(mejer);
+
+const maro = postac(0x3d3427, {});
+maro.position.set(1.5, 0, 4.2); maro.rotation.y = -0.6; scena.add(maro);
+
+const magda = postac(0x5c2436, {wlosy:true});
+magda.position.set(0, 0, 0); magda.visible = false; scena.add(magda);
+
+const POSTACIE = {majkello:majkello, jerzy:jerzy, mejer:mejer, maro:maro, magda:magda};
+
+/* reflektor na mówiącego */
+const swiatloFokus = new THREE.PointLight(0xffe2b0, 0, 7, 2);
+swiatloFokus.position.set(0, 4, 4);
+scena.add(swiatloFokus);
+
+/* ============================================================
+   TWEENY — prosty system animacji
+   ============================================================ */
+const tweeny = [];
+function tween(dur, update, onDone){
+  tweeny.push({t:0, dur:dur, update:update, onDone:onDone});
+}
+function ease(k){ return k<0.5 ? 2*k*k : 1-Math.pow(-2*k+2,2)/2; }
+
+function idzDo(kto, cel, dur, onDone){
+  const start = kto.position.clone();
+  const kier = Math.atan2(cel.x-start.x, cel.z-start.z);
+  kto.rotation.y = kier;
+  kto.userData.tempo = 3;
+  tween(dur, function(k){
+    kto.position.lerpVectors(start, cel, ease(k));
+  }, function(){
+    kto.userData.tempo = 1;
+    kto.lookAt(new THREE.Vector3(0, kto.position.y, 3));
+    if(onDone) onDone();
+  });
+}
+
+/* ============================================================
+   KAMERY
+   ============================================================ */
+const KAMERY = {
+  szeroki:  {poz:[-24, 10, 40],  cel:[10, 6, -12]},
+  zabka:    {poz:[-36, 3.2, 17], cel:[-16, 1.6, 7]},
+  ulica:    {poz:[20, 3, 24],    cel:[10, 1.5, 9]},
+  most:     {poz:[-12, 4.5, 28], cel:[5, 1.2, 14]},
+  grupa:    {poz:[11, 5, 19],    cel:[0, 1.6, 4]},
+  zblizenie:{poz:[6, 2.5, 12.5], cel:[0, 1.5, 4]},
+  auto:     {poz:[12, 2.6, 17],  cel:[4, 1.2, 11]},
+  fin:      {poz:[-6, 12, 30],   cel:[4, 4, -6]}
+};
+let kamCelPoz = new THREE.Vector3().fromArray(KAMERY.szeroki.poz);
+let kamCelLook = new THREE.Vector3().fromArray(KAMERY.szeroki.cel);
+
+function ustawKamere(nazwa, fokus){
+  const k = KAMERY[nazwa] || KAMERY.grupa;
+  kamCelPoz.fromArray(k.poz);
+  kamCelLook.fromArray(k.cel);
+  if(fokus && POSTACIE[fokus]){
+    const p = POSTACIE[fokus].position;
+    kamCelLook.set(p.x*0.6 + kamCelLook.x*0.4, 1.6, p.z*0.6 + kamCelLook.z*0.4);
+  }
+}
+
+/* ============================================================
+   AKCJE BEATÓW
+   ============================================================ */
+const AKCJE = {
+  intro: function(){},
+  majkelloIdzie: function(){
+    majkello.visible = true;
+    idzDo(majkello, new THREE.Vector3(-2.8, 0, 5.2), 4.5);
+  },
+  jerzyBiegnie: function(){
+    jerzy.visible = true;
+    jerzy.userData.tempo = 5;
+    idzDo(jerzy, new THREE.Vector3(3.2, 0, 5.6), 3.2);
+  },
+  beemer: function(){
+    beemer.visible = true;
+    const start = new THREE.Vector3(2, 0, 85);
+    const stop  = new THREE.Vector3(6, 0, 12);
+    beemer.position.copy(start);
+    beemer.rotation.y = 0;
+    tween(4.2, function(k){
+      const e = 1-Math.pow(1-k, 3); // ease-out: hamuje pod koniec
+      beemer.position.lerpVectors(start, stop, e);
+      beemer.rotation.y = e * 0.35;
+    });
+  },
+  zbiorka: function(){},
+  magdaWysiada: function(){
+    magda.visible = true;
+    magda.position.set(7.9, 0, 11.4);
+    magda.scale.set(0.01, 0.01, 0.01);
+    tween(0.6, function(k){
+      const s = ease(k); magda.scale.set(s, s, s);
+    });
+  },
+  magdaDolacza: function(){
+    idzDo(magda, new THREE.Vector3(0.1, 0, 6.4), 2.6);
+  },
+  toast: function(){
+    Object.keys(POSTACIE).forEach(function(n){
+      POSTACIE[n].userData.tempo = 1.8;
+    });
+  }
+};
+
+/* ============================================================
+   LEKTOR — Web Speech API, polski głos, jedna kwestia naraz
+   ============================================================ */
+let lektorWl = true;
+let glosyPl = [];
+function zaladujGlosy(){
+  if(!('speechSynthesis' in window)) return;
+  const wszystkie = speechSynthesis.getVoices();
+  glosyPl = wszystkie.filter(function(v){ return v.lang && v.lang.toLowerCase().indexOf('pl') === 0; });
+}
+if('speechSynthesis' in window){
+  zaladujGlosy();
+  speechSynthesis.onvoiceschanged = zaladujGlosy;
+}
+
+/* profil głosu per postać: tempo + wysokość + który polski głos (jeśli jest ich kilka) */
+const PROFILE_GLOSU = {
+  NARRATOR:{rate:0.92, pitch:0.85, idx:0},
+  MAJKELLO:{rate:1.00, pitch:0.72, idx:0},
+  MEJER:   {rate:1.04, pitch:0.62, idx:1},
+  JERZY:   {rate:1.20, pitch:1.05, idx:2},  // zdyszany po dysze
+  MAGDA:   {rate:1.06, pitch:1.35, idx:1}
+};
+
+function cisza(){
+  if('speechSynthesis' in window) speechSynthesis.cancel();
+}
+
+function mow(beat){
+  if(!lektorWl || !('speechSynthesis' in window)) return;
+  cisza();
+  const kto = beat.typ === 'dialog' ? beat.kto : 'NARRATOR';
+  const cfg = PROFILE_GLOSU[kto] || PROFILE_GLOSU.NARRATOR;
+  const u = new SpeechSynthesisUtterance(beat.tekst);
+  u.lang = 'pl-PL';
+  if(glosyPl.length) u.voice = glosyPl[cfg.idx % glosyPl.length];
+  u.rate = cfg.rate;
+  u.pitch = cfg.pitch;
+  if(beat.fokus && POSTACIE[beat.fokus]){
+    u.onend = function(){ POSTACIE[beat.fokus].userData.mowi = false; };
+  }
+  /* cancel() + natychmiastowy speak() potrafi zjeść kwestię w Chrome — mikropauzą to obchodzimy */
+  setTimeout(function(){ speechSynthesis.speak(u); }, 80);
+}
+
+const btnLektor = document.getElementById('btnLektor');
+btnLektor.addEventListener('click', function(){
+  lektorWl = !lektorWl;
+  btnLektor.classList.toggle('wyciszony', !lektorWl);
+  btnLektor.textContent = lektorWl ? '🔊 lektor' : '🔇 lektor';
+  if(!lektorWl) cisza();
+  else if(indeks >= 0 && indeks < BEATS.length) mow(BEATS[indeks]);
+});
+
+/* ============================================================
+   KONTROLER NARRACJI — jedno źródło prawdy
+   ============================================================ */
+const elNarracja = document.getElementById('narracja');
+const elTag = document.getElementById('tagMem');
+const elTekst = document.getElementById('tekstProza');
+const elKropki = document.getElementById('kropki');
+const btnDalej = document.getElementById('btnDalej');
+const elFinal = document.getElementById('final');
+const elTytul = document.getElementById('tytulRog');
+
+BEATS.forEach(function(b){
+  const k = document.createElement('div');
+  k.className = 'kropka' + (b.typ === 'dialog' ? ' dialog' : '');
+  elKropki.appendChild(k);
+});
+const kropki = Array.prototype.slice.call(elKropki.children);
+
+let indeks = -1;
+let wToku = false;
+let gra = false;
+
+function pokazBeat(i){
+  const b = BEATS[i];
+
+  // reset stanu mówienia
+  Object.keys(POSTACIE).forEach(function(n){ POSTACIE[n].userData.mowi = false; });
+  swiatloFokus.intensity = 0;
+
+  // tekst — zawsze nadpisanie, nigdy nakładanie
+  if(b.typ === 'dialog'){
+    elTag.className = 'dialogowy';
+    elTag.textContent = b.kto;
+    elTekst.className = 'kwestia';
+    elTekst.textContent = b.tekst;
+    if(b.fokus && POSTACIE[b.fokus]){
+      POSTACIE[b.fokus].userData.mowi = true;
+      const p = POSTACIE[b.fokus].position;
+      swiatloFokus.position.set(p.x, 3.4, p.z);
+      swiatloFokus.intensity = 1.6;
+    }
+  } else {
+    elTag.className = b.tag ? '' : 'pusty';
+    elTag.textContent = b.tag || '';
+    elTekst.className = '';
+    elTekst.textContent = b.tekst;
+  }
+
+  mow(b);
+
+  kropki.forEach(function(k, j){ k.classList.toggle('aktywna', j === i); });
+  ustawKamere(b.kamera, b.fokus);
+  if(b.akcja && AKCJE[b.akcja]) AKCJE[b.akcja]();
+
+  // płynne wejście tekstu
+  elNarracja.classList.remove('widoczna');
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){ elNarracja.classList.add('widoczna'); });
+  });
+
+  btnDalej.textContent = (i === BEATS.length - 1) ? 'Koniec nocy' : 'Dalej →';
+}
+
+function dalej(){
+  if(!gra || wToku) return;
+  wToku = true;
+  setTimeout(function(){ wToku = false; }, 450); // blokada podwójnego kliknięcia
+  indeks++;
+  if(indeks >= BEATS.length){
+    cisza();
+    elFinal.classList.add('widoczny');
+    elNarracja.classList.remove('widoczna');
+    return;
+  }
+  pokazBeat(indeks);
+}
+
+btnDalej.addEventListener('click', dalej);
+document.addEventListener('keydown', function(e){
+  if(e.code === 'Space' || e.code === 'Enter'){ e.preventDefault(); dalej(); }
+});
+
+/* start */
+document.getElementById('btnStart').addEventListener('click', function(){
+  document.getElementById('start').classList.add('znika');
+  elTytul.style.opacity = 1;
+  btnLektor.classList.add('widoczny');
+  gra = true;
+  /* odblokowanie audio gestem użytkownika (wymóg przeglądarek) */
+  if('speechSynthesis' in window){
+    const pusta = new SpeechSynthesisUtterance(' ');
+    pusta.volume = 0; speechSynthesis.speak(pusta);
+  }
+  setTimeout(dalej, 700);
+});
+
+/* restart */
+document.getElementById('btnRestart').addEventListener('click', function(){
+  cisza();
+  elFinal.classList.remove('widoczny');
+  indeks = -1;
+  majkello.visible = false; majkello.position.set(-26, 0, 9);
+  jerzy.visible = false; jerzy.position.set(46, 0, 16);
+  magda.visible = false; magda.scale.set(1,1,1);
+  beemer.visible = false; beemer.position.set(2, 0, 85);
+  Object.keys(POSTACIE).forEach(function(n){ POSTACIE[n].userData.tempo = 1; });
+  tweeny.length = 0;
+  ustawKamere('szeroki');
+  setTimeout(dalej, 400);
+});
+
+/* ============================================================
+   PĘTLA
+   ============================================================ */
+const zegar = new THREE.Clock();
+function petla(){
+  requestAnimationFrame(petla);
+  const dt = Math.min(zegar.getDelta(), 0.05);
+  const t = zegar.elapsedTime;
+
+  // tweeny
+  for(let i = tweeny.length - 1; i >= 0; i--){
+    const tw = tweeny[i];
+    tw.t += dt / tw.dur;
+    if(tw.t >= 1){
+      tw.update(1);
+      tweeny.splice(i, 1);
+      if(tw.onDone) tw.onDone();
+    } else {
+      tw.update(tw.t);
+    }
+  }
+
+  // idle postaci
+  Object.keys(POSTACIE).forEach(function(n){
+    const p = POSTACIE[n];
+    if(!p.visible) return;
+    const u = p.userData;
+    const bob = Math.sin(t * 3 * u.tempo + u.faza) * 0.04 * u.tempo;
+    p.children[1].position.y = 1.3 + bob;           // tors
+    p.children[2].position.y = 2.05 + bob * 1.2;    // głowa
+    if(u.mowi){
+      p.children[2].rotation.x = Math.sin(t * 9) * 0.06;
+    } else {
+      p.children[2].rotation.x *= 0.9;
+    }
+  });
+
+  // deszcz
+  const arr = geoDeszcz.attributes.position.array;
+  for(let i = 0; i < ILE_KROPLI; i++){
+    arr[i*6+1] -= dt * 28;
+    arr[i*6+4] -= dt * 28;
+    if(arr[i*6+1] < 0){
+      const y = 40 + Math.random() * 8;
+      arr[i*6+1] = y; arr[i*6+4] = y - 0.8;
+    }
+  }
+  geoDeszcz.attributes.position.needsUpdate = true;
+
+  // migotanie neonu Rotundy
+  const flicker = 0.9 + Math.sin(t * 17) * 0.04 + Math.sin(t * 3.1) * 0.05;
+  rotunda.children[0].material.emissiveIntensity = flicker;
+
+  // kamera — płynny dojazd + delikatny dryf
+  const dryfX = Math.sin(t * 0.25) * 0.6;
+  const dryfY = Math.sin(t * 0.18) * 0.3;
+  kamera.position.x += (kamCelPoz.x + dryfX - kamera.position.x) * dt * 1.6;
+  kamera.position.y += (kamCelPoz.y + dryfY - kamera.position.y) * dt * 1.6;
+  kamera.position.z += (kamCelPoz.z - kamera.position.z) * dt * 1.6;
+  celKamery.lerp(kamCelLook, dt * 1.8);
+  kamera.lookAt(celKamery);
+
+  renderer.render(scena, kamera);
+}
+petla();
+
+addEventListener('resize', function(){
+  kamera.aspect = innerWidth / innerHeight;
+  kamera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+})();
+</script>
+</body>
+</html>
