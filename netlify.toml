@@ -1,0 +1,14 @@
+# Statyczna strona, bez budowania — publikujemy katalog główny.
+[build]
+  publish = "."
+
+# Service worker i strona zawsze świeże, żeby aktualizacje docierały na telefon.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
