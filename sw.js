@@ -2,7 +2,7 @@
 // Strona (HTML) najpierw z sieci, żeby nowe wersje docierały na telefon;
 // bez sieci albo przy słabym zasięgu — z pamięci podręcznej.
 // Ikony z pamięci podręcznej (fonty są wbudowane w index.html) (zmieniają się tylko razem z numerem wersji).
-const VERSION = 'karmienia-v2';
+const VERSION = 'karmienia-v3';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './favicon.svg',
   './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'
@@ -51,6 +51,8 @@ async function cacheFirst(request) {
 
 self.addEventListener('fetch', event => {
   const request = event.request;
-  if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
+  const url = new URL(request.url);
+  // Wspólne dane (/api/) zawsze prosto z serwera, nigdy z pamięci podręcznej.
+  if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
   event.respondWith(isPage(request) ? networkFirst(request) : cacheFirst(request));
 });

@@ -1,0 +1,9 @@
+{
+  "name": "karmienia",
+  "private": true,
+  "type": "module",
+  "description": "Karmienia: dziennik karmienia i snu (PWA) ze wspólnymi danymi przez Netlify",
+  "dependencies": {
+    "@netlify/blobs": "^11.1.6"
+  }
+}

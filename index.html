@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Karmienia">
   <meta name="format-detection" content="telephone=no">
-  <meta name="description" content="Dziennik karmienia: ile minęło od ostatniego karmienia, zapis godziny i mililitrów, podsumowanie 24 godzin i wykres tygodniowy.">
+  <meta name="description" content="Dziennik karmienia i snu: ile minęło od ostatniego karmienia, porcje, drzemki i wspólne dane na dwóch telefonach.">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./apple-touch-icon.png">
@@ -43,20 +43,22 @@
       --dots: rgba(0,0,0,.16);
       --on-yellow: #000000;
       --field: #ffffff;
+      --sleep: #4153c4;        /* sen: nocny błękit */
+      --sleep-pale: #dde2ff;
     }
     @media (prefers-color-scheme: dark) {
       :root:not([data-theme="light"]) {
         color-scheme: dark;
         --text: #f1efff; --muted: #a9afd4; --paper: #1d2550; --page: #0e1433; --page-dot: #1a2352;
         --yellow: #e8bd25; --yellow-pale: #3b3620; --cyan: #2f8fc4; --cyan-pale: #18345a;
-        --magenta: #d9508d; --magenta-pale: #44203f; --red: #ff6b5f; --dots: rgba(0,0,0,.35); --field: #141b3d;
+        --magenta: #d9508d; --magenta-pale: #44203f; --red: #ff6b5f; --dots: rgba(0,0,0,.35); --field: #141b3d; --sleep: #6476e8; --sleep-pale: #262f66;
       }
     }
     :root[data-theme="dark"] {
       color-scheme: dark;
       --text: #f1efff; --muted: #a9afd4; --paper: #1d2550; --page: #0e1433; --page-dot: #1a2352;
       --yellow: #e8bd25; --yellow-pale: #3b3620; --cyan: #2f8fc4; --cyan-pale: #18345a;
-      --magenta: #d9508d; --magenta-pale: #44203f; --red: #ff6b5f; --dots: rgba(0,0,0,.35); --field: #141b3d;
+      --magenta: #d9508d; --magenta-pale: #44203f; --red: #ff6b5f; --dots: rgba(0,0,0,.35); --field: #141b3d; --sleep: #6476e8; --sleep-pale: #262f66;
     }
 
     * { box-sizing:border-box; }
@@ -68,7 +70,7 @@
       min-height:100vh; -webkit-tap-highlight-color:transparent;
     }
     /* Czarna osłona pod paskiem statusu iPhone'a (tryb black-translucent) */
-    body::before { content:""; position:fixed; z-index:20; top:0; left:0; right:0; height:env(safe-area-inset-top); background:#000; }
+    body::before { content:""; position:fixed; z-index:20; top:0; left:0; right:0; height:env(safe-area-inset-top, 0px); background:#000; }
     h1,h2,h3,p { margin:0; }
     button,input { font:inherit; color:inherit; }
     button { cursor:pointer; touch-action:manipulation; }
@@ -76,14 +78,14 @@
     .comic { font-family:"Bangers",Impact,sans-serif; font-weight:400; letter-spacing:.04em; }
 
     /* ---------- Pasek tytułowy ---------- */
-    .topbar { background:#000; color:#fff; padding:calc(12px + env(safe-area-inset-top)) 18px 12px; border-bottom:4px solid #000; }
+    .topbar { background:#000; color:#fff; padding-block:12px; padding-left:max(18px, env(safe-area-inset-left, 0px)); padding-right:max(18px, env(safe-area-inset-right, 0px)); border-bottom:4px solid #000; }
     .topbar-in { max-width:560px; margin:auto; display:flex; align-items:center; justify-content:space-between; gap:12px; }
     .logo { font-size:34px; line-height:1; color:var(--yellow); text-shadow:3px 3px 0 #ff4f9a; letter-spacing:.05em; }
     .today { font-size:13px; color:#cfd3ea; margin-top:3px; }
     .theme-btn { display:inline-flex; align-items:center; gap:6px; border:2px solid #fff; background:#000; color:#fff; border-radius:999px; padding:6px 12px 6px 9px; font-size:13px; font-weight:700; }
     .theme-btn svg { width:18px; height:18px; }
 
-    .page { max-width:560px; margin:auto; padding:26px 16px calc(40px + env(safe-area-inset-bottom)); }
+    .page { max-width:592px; margin:auto; padding-block:26px 40px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); }
 
     /* ---------- Kadry ---------- */
     .panel { position:relative; background:var(--paper); border:3px solid var(--ink); border-radius:5px; box-shadow:5px 5px 0 var(--ink); padding:18px; margin-bottom:20px; }
@@ -193,7 +195,7 @@
     #importFile { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
 
     /* ---------- Komunikat i efekt dźwiękowy ---------- */
-    .toast { position:fixed; z-index:30; left:50%; bottom:calc(18px + env(safe-area-inset-bottom)); transform:translate(-50%,16px); max-width:92%;
+    .toast { position:fixed; z-index:30; left:50%; bottom:calc(18px + env(safe-area-inset-bottom, 0px)); transform:translate(-50%,16px); max-width:92%;
       background:#000; color:#fff; border:3px solid #fff; border-radius:999px; padding:9px 18px; font-weight:700; font-size:15px; text-align:center;
       opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; }
     .toast.show { opacity:1; transform:translate(-50%,0); }
@@ -202,8 +204,63 @@
     .sfx.go { animation:pow .95s cubic-bezier(.2,.9,.3,1.3) forwards; }
     @keyframes pow { 0% { opacity:1; transform:scale(.2) rotate(-14deg); } 22% { opacity:1; transform:scale(1.08) rotate(-6deg); } 34% { transform:scale(1) rotate(-6deg); } 78% { opacity:1; transform:scale(1) rotate(-6deg); } 100% { opacity:0; transform:scale(1.15) rotate(-6deg) translateY(-14px); } }
 
+    .scrim { position:fixed; z-index:40; inset:0; background:rgba(0,0,0,.55); display:grid; place-items:center;
+      padding:max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+    .ask { width:100%; max-width:380px; background:var(--paper); color:var(--text); border:3px solid var(--ink); border-radius:5px; box-shadow:6px 6px 0 var(--ink); padding:20px 18px 18px; }
+    .ask-title { font-size:26px; line-height:1.05; }
+    .ask-text { margin-top:8px; font-size:15px; }
+    .ask-actions { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:18px; }
+    .ask-actions .btn { padding:11px 8px; }
+    .btn-danger { background:var(--red); color:#fff; }
+    .status { display:inline-block; margin-top:8px; font-size:13px; font-weight:700; padding:2px 8px; border:2px solid var(--ink); border-radius:999px; background:var(--cyan-pale); color:var(--text); }
+    /* ---------- Zakładki ---------- */
+    .views { display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:560px; margin:12px auto 0; }
+    .views button { border:2.5px solid #fff; border-radius:5px; background:#000; color:#fff; padding:8px 6px 6px; font-family:"Bangers",Impact,sans-serif; font-size:24px; letter-spacing:.05em; line-height:1; }
+    .views button[aria-selected="true"] { background:var(--yellow); color:#000; border-color:var(--yellow); box-shadow:3px 3px 0 #ff4f9a; }
+
+    /* ---------- Sen ---------- */
+    .hero-sleep .caption { background:var(--sleep); color:#fff; }
+    .hero-sleep.awake .caption { background:var(--yellow); color:var(--on-yellow); }
+    .hero-sleep::after { background:radial-gradient(var(--sleep) 2.4px, transparent 2.9px) 0 0/11px 11px; }
+    .hero-sleep .since { text-shadow:4px 4px 0 var(--sleep); }
+    .hero-sleep.awake .since { text-shadow:4px 4px 0 var(--yellow); }
+    .hero-sleep .btn-save { margin-top:18px; position:relative; z-index:1; }
+    .hero-sleep .btn-stop { background:var(--sleep); color:#fff; }
+    .stat-sleep { background:var(--sleep-pale); }
+    .stat-awake { background:var(--yellow-pale); }
+    .stat-val .hm small { font-size:22px; margin:0 4px 0 2px; }
+    .sfields { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; }
+    .sfields label { min-width:0; }
+    .durs { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 4px; align-items:center; }
+    .durs .lbl { font-size:14px; font-weight:700; margin-right:2px; }
+    .durs .chip { height:40px; padding:0 10px; font-size:19px; }
+    .field-optional { font-weight:600; color:var(--muted); font-size:13px; }
+    .tl { position:relative; height:46px; border:3px solid var(--ink); border-radius:5px; overflow:hidden;
+      background:repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--ink) 12%, transparent) 6px 8px), var(--paper); }
+    .tl-seg { position:absolute; top:0; bottom:0; }
+    .tl-seg.sleep { background:radial-gradient(var(--dots) 1.3px, transparent 1.7px) 0 0/6px 6px, var(--sleep); }
+    .tl-seg.awake { background:var(--yellow); }
+    .tl-now { position:absolute; top:-3px; bottom:-3px; width:3px; background:var(--magenta); }
+    .tl-hours { position:relative; height:18px; margin-top:4px; font-size:12px; font-weight:700; color:var(--muted); font-variant-numeric:tabular-nums; }
+    .tl-hours span { position:absolute; transform:translateX(-50%); }
+    .tl-hours span:first-child { transform:none; } .tl-hours span:last-child { transform:translateX(-100%); }
+    .tl-ticks { position:absolute; inset:0; pointer-events:none; background:repeating-linear-gradient(90deg, transparent 0 calc(25% - 2px), var(--ink) calc(25% - 2px) 25%); opacity:.35; }
+    .legend { display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:8px; font-size:13px; font-weight:600; color:var(--muted); }
+    .legend i { display:inline-block; width:14px; height:14px; border:2px solid var(--ink); border-radius:3px; vertical-align:-2px; margin-right:5px; }
+    .legend .k-sleep { background:var(--sleep); } .legend .k-awake { background:var(--yellow); }
+    .log { margin-top:6px; }
+    .log-row { display:flex; align-items:center; gap:12px; padding:11px 0; border-bottom:2px dashed color-mix(in srgb, var(--ink) 30%, transparent); }
+    .log-row:last-child { border-bottom:0; }
+    .log-time { min-width:112px; text-align:center; font-family:"Bangers",Impact,sans-serif; font-size:20px; letter-spacing:.04em; line-height:1; padding:8px 6px 6px; border:2.5px solid var(--ink); border-radius:5px; font-variant-numeric:tabular-nums; }
+    .log-row.sleep .log-time { background:var(--sleep); color:#fff; }
+    .log-row.awake .log-time { background:var(--yellow-pale); }
+    .log-info { flex:1; min-width:0; }
+    .log-kind { font-size:14px; font-weight:700; }
+    .log-dur { font-family:"Bangers",Impact,sans-serif; font-size:24px; letter-spacing:.04em; line-height:1.05; }
+    .log-note { font-size:12px; color:var(--muted); font-weight:600; }
     @media (max-width:370px) {
-      .page { padding-left:12px; padding-right:12px; }
+      .log-time { min-width:96px; font-size:17px; }
+      .views button { font-size:21px; }
       .panel { padding:15px; }
       .hero { padding:32px 15px 18px; }
       .since { font-size:68px; } .since .u { font-size:30px; }
@@ -214,6 +271,16 @@
       .tabs button { white-space:normal; line-height:1.15; padding:8px 3px; font-size:12px; }
     }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition:none !important; animation:none !important; } }
+
+    /* ---------- Wspólne dane (kod rodziny) ---------- */
+    .sync { margin-top:12px; }
+    .sync-code { display:inline-block; margin:4px 0 0; font-family:"Bangers",Impact,sans-serif; font-size:30px; letter-spacing:.08em; padding:4px 12px 1px; border:3px solid var(--ink); border-radius:5px; background:var(--yellow); color:var(--on-yellow); box-shadow:3px 3px 0 var(--ink); -webkit-user-select:all; user-select:all; }
+    .sync-join { display:flex; gap:10px; margin-top:4px; }
+    .sync-join .field { flex:1; height:48px; font-size:17px; text-transform:uppercase; letter-spacing:.06em; }
+    .sync-join .btn { width:auto; flex:none; padding:9px 14px; font-size:14px; box-shadow:3px 3px 0 var(--ink); }
+    .sync .flabel { margin-top:4px; }
+    .status.warn { background:var(--yellow-pale); }
+    .status.bad { background:var(--magenta-pale); }
   </style>
 </head>
 <body>
@@ -225,9 +292,14 @@
       </div>
       <button type="button" class="theme-btn" id="themeBtn"></button>
     </div>
+    <div class="views" role="tablist" aria-label="Widok">
+      <button type="button" role="tab" id="tabFeed" aria-controls="viewFeed" aria-selected="true">Karmienie</button>
+      <button type="button" role="tab" id="tabSleep" aria-controls="viewSleep" aria-selected="false">Sen</button>
+    </div>
   </header>
 
   <main class="page">
+    <div id="viewFeed" role="tabpanel" aria-labelledby="tabFeed">
     <section class="panel hero" aria-labelledby="sinceLabel">
       <p class="caption" id="sinceLabel">Od ostatniego karmienia</p>
       <p class="since comic" id="since">—</p>
@@ -292,9 +364,90 @@
       <div id="feedList"></div>
     </section>
 
+    </div>
+
+    <div id="viewSleep" role="tabpanel" aria-labelledby="tabSleep" hidden>
+      <section class="panel hero hero-sleep" id="sleepHero" aria-labelledby="sleepLabel">
+        <p class="caption" id="sleepLabel">Sen</p>
+        <p class="since comic" id="sleepSince">Jeszcze nic</p>
+        <p class="since-sub" id="sleepSub">Naciśnij Start snu, gdy maluch zaśnie.</p>
+        <button type="button" class="btn btn-save" id="sleepToggle">Start snu</button>
+      </section>
+
+      <div class="duo">
+        <section class="panel stat-sleep" aria-labelledby="ts24">
+          <h2 class="stat-title" id="ts24">Sen w 24&nbsp;h</h2>
+          <p class="stat-val comic" id="sleep24">0<small>min</small></p>
+          <p class="stat-sub" id="sleep24sub">Brak drzemek</p>
+        </section>
+        <section class="panel stat-awake" aria-labelledby="tsl">
+          <h2 class="stat-title" id="tsl">Najdłuższy sen</h2>
+          <p class="stat-val comic" id="sleepLong">—</p>
+          <p class="stat-sub" id="sleepLongSub">&nbsp;</p>
+        </section>
+      </div>
+
+      <section class="panel" aria-labelledby="dayTitle">
+        <div class="panel-head"><h2 class="panel-title comic" id="dayTitle">Doba</h2><span class="note" id="sleepDayTotals"></span></div>
+        <div class="range-row">
+          <span class="range" id="sleepDayLabel"></span>
+          <div class="arrows">
+            <button type="button" class="icon-btn" id="sleepPrev" aria-label="Poprzedni dzień"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+            <button type="button" class="icon-btn" id="sleepNext" aria-label="Następny dzień"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+          </div>
+        </div>
+        <div class="tl" id="sleepBar" role="img" aria-label="Oś doby"><div class="tl-ticks"></div></div>
+        <div class="tl-hours" aria-hidden="true"><span style="left:0">0:00</span><span style="left:25%">6:00</span><span style="left:50%">12:00</span><span style="left:75%">18:00</span><span style="left:100%">24:00</span></div>
+        <div class="legend"><span><i class="k-sleep"></i>Sen</span><span><i class="k-awake"></i>Nie śpi</span><span>Kreski: brak danych</span></div>
+        <div class="log" id="sleepLog"></div>
+      </section>
+
+      <section class="panel" id="sleepPanel" aria-labelledby="sleepFormTitle">
+        <div class="panel-head"><h2 class="panel-title comic" id="sleepFormTitle">Dodaj sen ręcznie</h2></div>
+        <form id="sleepForm" novalidate>
+          <div class="sfields">
+            <label><span class="flabel">Początek snu</span><input class="field field-time" id="sleepStart" type="datetime-local"></label>
+            <label><span class="flabel">Koniec snu <span class="field-optional" id="sleepEndHint" hidden>(puste = nadal śpi)</span></span><input class="field field-time" id="sleepEnd" type="datetime-local"></label>
+          </div>
+          <div class="durs" role="group" aria-label="Długość snu od początku">
+            <span class="lbl">Długość:</span>
+            <button type="button" class="chip" data-dur="30">30 min</button>
+            <button type="button" class="chip" data-dur="60">1 h</button>
+            <button type="button" class="chip" data-dur="90">1,5 h</button>
+            <button type="button" class="chip" data-dur="120">2 h</button>
+            <button type="button" class="chip" data-dur="180">3 h</button>
+          </div>
+          <p id="sleepError" class="form-error" role="alert"></p>
+          <button class="btn btn-save" id="sleepSubmit" type="submit">Zapisz sen</button>
+          <button class="btn btn-cancel" id="sleepCancel" type="button" hidden>Anuluj edycję</button>
+        </form>
+      </section>
+    </div>
+
     <footer class="foot">
-      <h2>Dane zostają na tym telefonie</h2>
-      <p>Wpisy zapisują się tylko w tej przeglądarce. Nie trafiają na żaden serwer i nie synchronizują się z innymi telefonami. Na iPhonie aplikacja dodana do ekranu początkowego ma osobne dane niż Safari. Wyczyszczenie danych przeglądarki usuwa historię, więc co jakiś czas zapisz kopię.</p>
+      <h2 id="storeTitle">Łączę…</h2>
+      <p id="storeText"></p>
+      <span class="status" id="storeStatus" hidden></span>
+      <div class="sync" id="syncBox" hidden>
+        <div id="syncOff">
+          <div class="foot-actions"><button type="button" class="btn" id="syncCreate">Utwórz kod rodziny</button></div>
+          <label class="flabel" for="syncInput">Mam kod z drugiego telefonu</label>
+          <form class="sync-join" id="syncJoin" novalidate>
+            <input class="field" id="syncInput" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="24" placeholder="XXXX-XXXX-XXXX" aria-describedby="syncError">
+            <button class="btn" type="submit" id="syncJoinBtn">Połącz</button>
+          </form>
+          <p id="syncError" class="form-error" role="alert"></p>
+        </div>
+        <div id="syncOn" hidden>
+          <p class="flabel">Kod rodziny</p>
+          <span class="sync-code" id="syncCode"></span>
+          <div class="foot-actions">
+            <button type="button" class="btn" id="syncShare">Wyślij kod</button>
+            <button type="button" class="btn" id="syncNow">Synchronizuj</button>
+            <button type="button" class="btn" id="syncLeave">Odłącz telefon</button>
+          </div>
+        </div>
+      </div>
       <p class="backup" id="backupInfo"></p>
       <div class="foot-actions">
         <button type="button" class="btn" id="exportJSON">Zapisz kopię</button>
@@ -310,6 +463,16 @@
     <svg viewBox="0 0 220 150"><polygon points="110,4 128,38 168,14 160,52 214,48 176,76 210,104 162,102 172,144 128,116 110,148 92,116 46,140 58,100 8,104 44,76 6,46 60,52 52,12 92,38" fill="#ffd60a" stroke="#000" stroke-width="5" stroke-linejoin="round"/><text x="110" y="90" text-anchor="middle" font-family="Bangers,Impact,sans-serif" font-size="40" letter-spacing="2" fill="#ff4f9a" stroke="#000" stroke-width="2" paint-order="stroke">GUL GUL!</text></svg>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="scrim" id="askScrim" hidden>
+    <div class="ask" role="dialog" aria-modal="true" aria-labelledby="askTitle" aria-describedby="askText">
+      <h2 class="ask-title comic" id="askTitle"></h2>
+      <p class="ask-text" id="askText"></p>
+      <div class="ask-actions">
+        <button type="button" class="btn" id="askNo">Anuluj</button>
+        <button type="button" class="btn btn-danger" id="askYes"></button>
+      </div>
+    </div>
+  </div>
 
   <script>
   (function () {
@@ -360,7 +523,7 @@
       if(!raw||typeof raw!=='object')return null;
       const amount=Number(raw.ml), dt=new Date(raw.at);
       if(!Number.isInteger(amount)||amount<1||amount>1000||!Number.isFinite(dt.getTime()))return null;
-      return { id:(typeof raw.id==='string'&&raw.id.length<140)?raw.id:makeId(), at:dt.toISOString(), ml:amount };
+      return { id:(typeof raw.id==='string'&&/^[A-Za-z0-9_~:@+-][A-Za-z0-9_.~:@+-]{0,119}$/.test(raw.id))?raw.id:makeId(), at:dt.toISOString(), ml:amount };
     }
     function sortEntries() { entries.sort((a,b)=>new Date(b.at)-new Date(a.at)); }
     function load() {
@@ -370,13 +533,196 @@
         entries=data.map(validFeed).filter(Boolean); sortEntries();
       } catch(e) { console.warn('Nie udało się odczytać zapisu',e); notify('Nie można odczytać zapisanych danych'); }
     }
+    // Lokalna kopia: szybki start i zapas, gdy pamięć konta jest niedostępna.
     function save() {
-      try { localStorage.setItem(STORE,JSON.stringify(entries)); return true; }
-      catch(e) { notify('Telefon nie pozwolił zapisać danych. Zapisz kopię.'); return false; }
+      try { localStorage.setItem(STORE,JSON.stringify(entries)); }
+      catch(e) { if(!db){ notify('Przeglądarka nie pozwoliła zapisać danych.'); return false; } }
+      return true;
     }
-    function askPersistence() {
-      try { if(navigator.storage&&navigator.storage.persist)navigator.storage.persisted().then(p=>{if(!p)navigator.storage.persist();}).catch(()=>{}); } catch(e) {}
+
+    // ---------- Pamięć konta (baza artefaktu) ----------
+    let db = null, feedsCol = null;
+    function remoteFail(e) {
+      const c=e&&e.code;
+      if(c==='quota_exceeded') notify('Pamięć jest pełna. Usuń stare wpisy.');
+      else if(c==='invalid_argument'||c==='revoked') notify('Brak uprawnień do zapisu na tej stronie.');
+      else notify('Nie udało się zapisać na koncie. Spróbuj ponownie.');
     }
+    async function retryOnce(fn) {
+      try { return await fn(); }
+      catch(e) { if(e&&e.code==='unavailable'){ await new Promise(r=>setTimeout(r,400+Math.random()*600)); return await fn(); } throw e; }
+    }
+    async function remotePut(item) { if(!feedsCol)return; try { await retryOnce(()=>feedsCol.doc(item.id).set({at:item.at,ml:item.ml})); } catch(e) { remoteFail(e); } }
+    async function remoteDel(id) { if(!feedsCol)return; try { await retryOnce(()=>feedsCol.doc(id).delete()); } catch(e) { remoteFail(e); } }
+    async function inBatches(items,fn) { for(let i=0;i<items.length;i+=5) await Promise.all(items.slice(i,i+5).map(fn)); }
+    function setStore(mode) {
+      const t=$('storeTitle'), x=$('storeText');
+      $('syncBox').hidden=!canFamily(); $('syncOff').hidden=mode==='family'; $('syncOn').hidden=mode!=='family';
+      if(mode!=='family') $('storeStatus').hidden=true;
+      if(mode==='remote') { t.textContent='Dane zapisane na Twoim koncie'; x.textContent='Wpisy zapisują się w pamięci tej strony na Twoim koncie Claude. Widać je na każdym urządzeniu, na którym otworzysz ten link. Jeśli udostępnisz stronę partnerce lub partnerowi z prawem edycji, oboje zobaczycie i dodacie te same wpisy.'; }
+      else if(mode==='family') { t.textContent='Dane wspólne'; x.textContent='Wpisy synchronizują się z każdym telefonem, na którym wpisano ten kod. Bez internetu też możesz zapisywać – wyślą się, gdy wróci zasięg.'; $('syncCode').textContent=fmtCode(familyCode()); }
+      else if(canFamily()) { t.textContent='Dane tylko na tym telefonie'; x.textContent='Żeby widzieć te same wpisy na dwóch telefonach: utwórz kod rodziny tutaj, a na drugim telefonie wpisz go w polu „Mam kod”.'; }
+      else if(onPages()) { t.textContent='Dane tylko na tym telefonie'; x.textContent='Wspólne wpisy z drugim telefonem działają w wersji tej aplikacji na Netlify. Tutaj wpisy zapisują się tylko na tym telefonie – rób regularnie kopię.'; }
+      else { t.textContent='Dane tylko w tej przeglądarce'; x.textContent='Ta strona nie ma teraz dostępu do pamięci konta (np. po wylogowaniu). Wpisy zapisują się tylko w tej przeglądarce i mogą zniknąć.'; }
+    }
+    async function connect() {
+      try { db = (window.claude&&window.claude.use) ? await window.claude.use('db') : null; } catch(e) { db=null; }
+      let mode='remote';
+      if(!db&&canFamily()&&familyCode()) { fam=familyDb(familyCode(),syncStatus); db=fam; mode='family'; }
+      if(!db) { setStore('local'); return; }
+      feedsCol=db.collection('feeds');
+      setStore(mode);
+      connectSleeps();
+      let first=true;
+      feedsCol.orderBy('at','desc').limit(1000).onSnapshot(snap=>{
+        const remote=snap.docs.map(d=>validFeed(Object.assign({id:d.id},d.data()))).filter(Boolean);
+        if(first&&!snap.metadata.fromCache) {
+          first=false;
+          // Wpisy zrobione wcześniej tylko w przeglądarce trafiają do pamięci konta.
+          const known=new Set(remote.map(x=>x.id)), extra=entries.filter(x=>!known.has(x.id));
+          if(extra.length) inBatches(extra,remotePut);
+          remote.push(...extra);
+        }
+        entries=remote; sortEntries(); save(); renderAll();
+      }, err=>{ if(err&&err.code==='revoked'){ setStore('local'); } else notify('Połączenie z pamięcią przerwane. Odśwież stronę.'); });
+    }
+    async function getDownloads() { try { return (window.claude&&window.claude.use) ? await window.claude.use('downloads') : null; } catch(e) { return null; } }
+
+    // ---------- Wspólne dane przez Netlify (kod rodziny) ----------
+    // Udaje bazę artefaktu (collection/doc/set/delete/onSnapshot), więc reszta aplikacji
+    // działa tak samo. Zmiany czekają w kolejce w telefonie (także bez internetu)
+    // i wysyłają się przy najbliższym połączeniu; co 15 s pobieramy zmiany drugiej osoby.
+    const SYNC_CODE_KEY='karmienia-kod-rodziny', SYNC_QUEUE_KEY='karmienia-kolejka', SYNC_JOINED_KEY='karmienia-dolaczono';
+    const SYNC_URL='/api/sync', SYNC_EVERY=15000, SYNC_BATCH=2000;
+    const CODE_CHARS='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    let fam=null;
+    function lsGet(k) { try { return localStorage.getItem(k); } catch(e) { return null; } }
+    function lsSet(k,v) { try { if(v==null)localStorage.removeItem(k); else localStorage.setItem(k,v); } catch(e) {} }
+    const normCode=(s)=>String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+    const fmtCode=(c)=>c.replace(/(.{4})(?=.)/g,'$1-');
+    const familyCode=()=>normCode(lsGet(SYNC_CODE_KEY));
+    // GitHub Pages nie uruchamia funkcji serwera, więc wspólne dane działają tylko na Netlify.
+    const onPages=()=>/\.github\.io$/.test(location.hostname);
+    const canFamily=()=>/^https?:$/.test(location.protocol)&&!window.claude&&!onPages();
+    function newCode() { const a=new Uint32Array(12); crypto.getRandomValues(a); return Array.from(a,x=>CODE_CHARS[x%CODE_CHARS.length]).join(''); }
+    async function syncRequest(code,body) {
+      const res=await fetch(SYNC_URL,{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','X-Kod-Rodziny':code},body:JSON.stringify(body)});
+      if(res.status===401) { const e=Error('zły kod'); e.code='bad'; throw e; }
+      if(!res.ok) throw Error(`HTTP ${res.status}`);
+      return res.json();
+    }
+    function familyDb(code,onStatus) {
+      const listeners={feeds:[],sleeps:[]};
+      let server=null, queue=[], busy=false, again=false, timer=null, soon=null, stopped=false, lastSig='';
+      // Pierwsze połączenie tego telefonu: jego dotychczasowe wpisy dołączają do wspólnych.
+      let joining=lsGet(SYNC_JOINED_KEY)!==code;
+      try { const q=JSON.parse(lsGet(SYNC_QUEUE_KEY)||'[]'); if(Array.isArray(q))queue=q; } catch(e) {}
+      const saveQueue=()=>lsSet(SYNC_QUEUE_KEY,queue.length?JSON.stringify(queue):null);
+      function view(col) {
+        const map=new Map(server[col].map(d=>[d.id,d]));
+        for(const op of queue) if(op.col===col) { if(op.op==='del')map.delete(op.id); else map.set(op.id,Object.assign({},op.data,{id:op.id})); }
+        return [...map.values()];
+      }
+      function emit() {
+        const sig=JSON.stringify([server,queue]);
+        if(sig===lastSig&&!joining)return;
+        lastSig=sig;
+        // fromCache:false tylko przy dołączaniu – wtedy aplikacja wysyła wpisy, których serwer jeszcze nie ma.
+        const metadata={fromCache:!joining};
+        for(const col of ['feeds','sleeps']) {
+          const docs=view(col).map(d=>{ const data=Object.assign({},d); delete data.id; return {id:d.id,data:()=>data}; });
+          for(const cb of listeners[col]) cb({docs,metadata});
+        }
+        if(joining) { joining=false; lsSet(SYNC_JOINED_KEY,code); }
+      }
+      async function sync() {
+        if(stopped)return;
+        if(busy) { again=true; return; }
+        busy=true; clearTimeout(timer); clearTimeout(soon);
+        const sending=queue.slice(0,SYNC_BATCH);
+        try {
+          const data=await syncRequest(code,{ops:sending});
+          if(stopped)return;
+          server={feeds:Array.isArray(data.feeds)?data.feeds:[],sleeps:Array.isArray(data.sleeps)?data.sleeps:[]};
+          queue=queue.slice(sending.length); saveQueue();
+          if(queue.length)again=true;
+          emit(); onStatus('ok');
+        } catch(e) { if(!stopped)onStatus(e.code==='bad'?'bad':'off'); }
+        finally {
+          busy=false;
+          if(again&&!stopped) { again=false; soon=setTimeout(sync,queue.length?300:0); }
+          else if(!stopped) timer=setTimeout(tick,SYNC_EVERY);
+        }
+      }
+      function tick() { if(document.hidden) timer=setTimeout(tick,SYNC_EVERY); else sync(); }
+      function push(op) {
+        if(stopped)return Promise.resolve();
+        queue.push(op); saveQueue(); onStatus('busy');
+        clearTimeout(soon); soon=setTimeout(sync,250);
+        return Promise.resolve();
+      }
+      return {
+        collection(col) {
+          const c={
+            doc:(id)=>({ set:(data)=>push({col,op:'set',id,data}), delete:()=>push({col,op:'del',id}) }),
+            orderBy:()=>c, limit:()=>c,
+            onSnapshot(cb) { listeners[col].push(cb); clearTimeout(soon); soon=setTimeout(sync,0); return ()=>{ listeners[col]=listeners[col].filter(x=>x!==cb); }; }
+          };
+          return c;
+        },
+        syncNow() { if(!stopped)sync(); },
+        pending:()=>queue.length,
+        stop() { stopped=true; clearTimeout(timer); clearTimeout(soon); }
+      };
+    }
+    function syncStatus(kind) {
+      const s=$('storeStatus');
+      if(!fam) { s.hidden=true; return; }
+      const n=fam.pending();
+      s.hidden=false; s.className='status'+(kind==='off'?' warn':kind==='bad'?' bad':'');
+      s.textContent=kind==='bad'?'Serwer nie przyjął kodu rodziny'
+        :kind==='off'?`Brak połączenia${n?` · do wysłania: ${n}`:''}`
+        :kind==='busy'?'Wysyłam…'
+        :`Zsynchronizowano o ${timeFmt.format(new Date())}`;
+    }
+    async function startFamily(code,create) {
+      const err=$('syncError'); err.textContent='';
+      $('syncCreate').disabled=$('syncJoinBtn').disabled=true;
+      try {
+        const res=await syncRequest(code,create?{ops:[],create:true}:{ops:[]});
+        if(!create&&!res.exists) { err.textContent='Nie ma takiego kodu. Sprawdź, czy jest dobrze przepisany.'; return; }
+      } catch(e) {
+        err.textContent=e.code==='bad'?'Kod ma 12 znaków: litery i cyfry.':'Brak połączenia z serwerem. Sprawdź internet i spróbuj ponownie.';
+        return;
+      } finally { $('syncCreate').disabled=$('syncJoinBtn').disabled=false; }
+      lsSet(SYNC_CODE_KEY,code); lsSet(SYNC_JOINED_KEY,null); lsSet(SYNC_QUEUE_KEY,null);
+      $('syncInput').value='';
+      await connect();
+      notify(create?'Kod gotowy. Wpisz go na drugim telefonie.':'Połączono. Pobieram wspólne wpisy…');
+    }
+    async function leaveFamily() {
+      const n=fam?fam.pending():0;
+      if(!await ask('Odłączyć ten telefon?',`Wpisy zostaną na tym telefonie, ale przestaną się synchronizować.${n?` Niewysłane zmiany (${n}) nie trafią na drugi telefon.`:''} Kod możesz wpisać ponownie później.`,'Odłącz'))return;
+      if(fam)fam.stop();
+      fam=null; db=null; feedsCol=null; sleepsCol=null;
+      lsSet(SYNC_CODE_KEY,null); lsSet(SYNC_JOINED_KEY,null); lsSet(SYNC_QUEUE_KEY,null);
+      setStore('local'); notify('Odłączono ten telefon');
+    }
+    async function shareCode() {
+      const code=fmtCode(familyCode());
+      const text=`Kod rodziny do aplikacji Karmienia: ${code}\n${location.origin}/\nW aplikacji przewiń na sam dół, wpisz kod w polu „Mam kod z drugiego telefonu” i naciśnij Połącz.`;
+      if(navigator.share) { try { await navigator.share({text}); return; } catch(e) { if(e&&e.name==='AbortError')return; } }
+      try { await navigator.clipboard.writeText(code); notify('Kod skopiowany'); } catch(e) { notify('Przepisz kod ręcznie'); }
+    }
+
+    // ---------- Okno potwierdzenia ----------
+    let askResolve=null;
+    function ask(title,text,yes) {
+      $('askTitle').textContent=title; $('askText').textContent=text; $('askYes').textContent=yes;
+      $('askScrim').hidden=false; $('askNo').focus();
+      return new Promise(r=>{ askResolve=r; });
+    }
+    function closeAsk(v) { $('askScrim').hidden=true; if(askResolve){ const r=askResolve; askResolve=null; r(v); } }
     const forDate = (key) => entries.filter(x=>localKey(new Date(x.at))===key);
     function inLast24() { const now=Date.now(),from=now-DAY; return entries.filter(x=>{const t=new Date(x.at).getTime();return t>=from&&t<=now;}); }
     const sum = (list) => list.reduce((t,x)=>t+x.ml,0);
@@ -532,10 +878,11 @@
       $('formTitle').textContent='Edytuj karmienie'; $('submitBtn').textContent='Zapisz zmiany'; $('cancelEdit').hidden=false; $('formError').textContent=''; syncPresets();
       $('entryPanel').scrollIntoView({behavior:'smooth',block:'start'});
     }
-    function deleteFeed(id) {
+    async function deleteFeed(id) {
       const f=entries.find(x=>x.id===id); if(!f)return;
-      if(!confirm(`Usunąć karmienie: ${f.ml} ml, ${relativeDay(new Date(f.at))} o ${timeFmt.format(new Date(f.at))}?`))return;
+      if(!await ask('Usunąć karmienie?',`${f.ml} ml, ${relativeDay(new Date(f.at))} o ${timeFmt.format(new Date(f.at))}.`,'Usuń'))return;
       entries=entries.filter(x=>x.id!==id); save(); if(id===editId)resetForm(); renderAll(); notify('Usunięto karmienie');
+      remoteDel(id);
     }
     function submitFeed(ev) {
       ev.preventDefault(); $('formError').textContent='';
@@ -548,7 +895,7 @@
       if(editing) { const i=entries.findIndex(x=>x.id===editId); if(i>=0)entries[i]=item; else entries.push(item); }
       else entries.push(item);
       if(!save())return;
-      askPersistence();
+      remotePut(item);
       selectedDate=localKey(date);
       weekOffset=Math.min(0,Math.ceil(differenceInDays(fromKey(selectedDate),fromKey(localKey(new Date())))/7))||0;
       historyMode='day'; resetForm(); $('amount').blur(); renderAll();
@@ -556,15 +903,27 @@
     }
 
     // ---------- Kopie ----------
-    function download(name,content,mime) { const blob=new Blob([content],{type:mime}); const url=URL.createObjectURL(blob), a=document.createElement('a'); a.href=url; a.download=name; document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); }
-    function downloadJSON() {
-      download(`karmienia-kopia-${localKey(new Date())}.json`,JSON.stringify({app:'Karmienia',version:1,exported:new Date().toISOString(),entries},null,2),'application/json;charset=utf-8');
+    async function download(name,content,mime) {
+      const dl=await getDownloads();
+      if(dl) {
+        try { await dl.save({filename:name,data:content}); return true; }
+        catch(e) { if(e&&e.code!=='declined')notify('Nie udało się pobrać pliku.'); return false; }
+      }
+      try {
+        const url=URL.createObjectURL(new Blob([content],{type:mime})), a=document.createElement('a');
+        a.href=url; a.download=name; document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000);
+        return true;
+      } catch(e) { notify('Nie udało się pobrać pliku.'); return false; }
+    }
+    async function downloadJSON() {
+      const ok=await download(`karmienia-kopia-${localKey(new Date())}.json`,JSON.stringify({app:'Karmienia',version:2,exported:new Date().toISOString(),entries,sleeps},null,2),'application/json');
+      if(!ok)return;
       try { localStorage.setItem(BACKUP_KEY,new Date().toISOString()); } catch(e) {}
       renderBackupInfo(); notify('Kopia zapisana');
     }
-    function downloadCSV() {
+    async function downloadCSV() {
       const rows=entries.slice().sort((a,b)=>new Date(a.at)-new Date(b.at)).map(f=>{const d=new Date(f.at);return `${localKey(d)};${timeFmt.format(d)};${f.ml}`;});
-      download(`karmienia-${localKey(new Date())}.csv`,'﻿'+['Data;Godzina;Ilość (ml)',...rows].join('\r\n'),'text/csv;charset=utf-8'); notify('Plik CSV pobrany');
+      if(await download(`karmienia-${localKey(new Date())}.csv`,'\ufeff'+['Data;Godzina;Ilość (ml)',...rows].join('\r\n'),'text/csv;charset=utf-8'))notify('Plik CSV pobrany');
     }
     async function importJSON(input) {
       const file=input.files&&input.files[0]; input.value=''; if(!file)return;
@@ -574,16 +933,227 @@
         if(!Array.isArray(raw)||raw.length>200000)throw Error('to nie jest kopia z tej aplikacji');
         const parsed=raw.map(validFeed); if(parsed.some(x=>!x))throw Error('plik zawiera nieprawidłowe wpisy');
         const ids=new Set(); for(const f of parsed){ if(ids.has(f.id))f.id=makeId(); ids.add(f.id); }
-        if(!confirm(`Wczytać ${parsed.length} ${feedsWord(parsed.length)} z kopii? Obecna historia (${entries.length}) zostanie zastąpiona.`))return;
+        const rawS=(!Array.isArray(data)&&Array.isArray(data.sleeps))?data.sleeps:null;
+        const parsedS=rawS?rawS.map(validSleep).filter(Boolean):null;
+        if(!await ask('Wczytać kopię?',`${parsed.length} ${feedsWord(parsed.length)}${parsedS?` i ${parsedS.length} ${napsWord(parsedS.length)}`:''} z pliku. Obecna historia zostanie zastąpiona.`,'Wczytaj'))return;
+        if(parsedS) await replaceSleeps(parsedS);
         const old=entries; entries=parsed; sortEntries(); if(!save()){ entries=old; return; }
-        selectedDate=localKey(new Date()); weekOffset=0; historyMode='day'; resetForm(); renderAll(); notify('Wczytano kopię');
-      } catch(e) { alert(`Nie udało się wczytać kopii: ${e.message}.`); }
+        selectedDate=localKey(new Date()); weekOffset=0; historyMode='day'; resetForm(); renderAll(); notify('Wczytuję kopię…');
+        const keep=new Set(parsed.map(x=>x.id));
+        await inBatches(old.filter(x=>!keep.has(x.id)).map(x=>x.id),remoteDel);
+        await inBatches(parsed,remotePut);
+        notify('Wczytano kopię');
+      } catch(e) { notify(`Nie udało się wczytać kopii: ${e.message}.`); }
     }
-    function clearAll() {
-      if(!entries.length){ notify('Historia jest już pusta'); return; }
-      if(!confirm(`Usunąć całą historię (${entries.length} ${feedsWord(entries.length)}) z tego telefonu? Tego nie da się cofnąć.`))return;
-      if(!confirm('Na pewno? Bez zapisanej kopii wpisy przepadną.'))return;
-      entries=[]; save(); selectedDate=localKey(new Date()); weekOffset=0; resetForm(); renderAll(); notify('Usunięto wszystkie karmienia');
+    async function clearAll() {
+      if(!entries.length&&!sleeps.length){ notify('Historia jest już pusta'); return; }
+      if(!entries.length){ if(await ask('Usunąć historię snu?',`${sleeps.length} ${napsWord(sleeps.length)}. Tego nie da się cofnąć.`,'Usuń sen')){ await replaceSleeps([]); notify('Usunięto historię snu'); } return; }
+      if(!await ask('Usunąć całą historię?',`${entries.length} ${feedsWord(entries.length)} zniknie na wszystkich urządzeniach. Bez zapisanej kopii nie da się tego cofnąć.`,'Usuń wszystko'))return;
+      const ids=entries.map(x=>x.id);
+      entries=[]; save(); selectedDate=localKey(new Date()); weekOffset=0; resetForm(); renderAll();
+      await inBatches(ids,remoteDel); notify('Usunięto wszystkie karmienia');
+      if(sleeps.length&&await ask('Usunąć też historię snu?',`${sleeps.length} ${napsWord(sleeps.length)}. Tego nie da się cofnąć.`,'Usuń sen')) { await replaceSleeps([]); notify('Usunięto historię snu'); }
+    }
+
+
+    // =====================================================================
+    // ---------- SEN ----------
+    // Zapis: {id, start (ISO), end (ISO | null = nadal śpi)}
+    const SLEEP_STORE='karmienia-sen-v1', VIEW_KEY='karmienia-widok';
+    let sleeps=[], sleepsCol=null, sleepDay=localKey(new Date()), sleepEditId=null;
+    const napsWord=(n)=>plural(n,'drzemka','drzemki','drzemek');
+    function validSleep(raw) {
+      if(!raw||typeof raw!=='object')return null;
+      const a=new Date(raw.start), b=raw.end==null?null:new Date(raw.end);
+      if(!Number.isFinite(a.getTime()))return null;
+      if(b&&(!Number.isFinite(b.getTime())||b<=a||b-a>36*HOUR))return null;
+      return { id:(typeof raw.id==='string'&&/^[A-Za-z0-9_~:@+-][A-Za-z0-9_.~:@+-]{0,119}$/.test(raw.id))?raw.id:makeId(), start:a.toISOString(), end:b?b.toISOString():null };
+    }
+    function sortSleeps() { sleeps.sort((x,y)=>new Date(x.start)-new Date(y.start)); }
+    function loadSleeps() { try { const d=JSON.parse(localStorage.getItem(SLEEP_STORE)||'[]'); if(Array.isArray(d)){ sleeps=d.map(validSleep).filter(Boolean); sortSleeps(); } } catch(e) {} }
+    function saveSleeps() { try { localStorage.setItem(SLEEP_STORE,JSON.stringify(sleeps)); } catch(e) { if(!db){ notify('Przeglądarka nie pozwoliła zapisać danych.'); return false; } } return true; }
+    async function sleepPut(x) { if(!sleepsCol)return; try { await retryOnce(()=>sleepsCol.doc(x.id).set({start:x.start,end:x.end||null})); } catch(e) { remoteFail(e); } }
+    async function sleepDel(id) { if(!sleepsCol)return; try { await retryOnce(()=>sleepsCol.doc(id).delete()); } catch(e) { remoteFail(e); } }
+    async function replaceSleeps(list) {
+      const old=sleeps, keep=new Set(list.map(x=>x.id));
+      sleeps=list.slice(); sortSleeps(); saveSleeps(); renderSleep();
+      await inBatches(old.filter(x=>!keep.has(x.id)).map(x=>x.id),sleepDel);
+      await inBatches(list,sleepPut);
+    }
+    function connectSleeps() {
+      sleepsCol=db.collection('sleeps');
+      let first=true;
+      sleepsCol.orderBy('start','desc').limit(1000).onSnapshot(snap=>{
+        const remote=snap.docs.map(d=>validSleep(Object.assign({id:d.id},d.data()))).filter(Boolean);
+        if(first&&!snap.metadata.fromCache) {
+          first=false;
+          const known=new Set(remote.map(x=>x.id)), extra=sleeps.filter(x=>!known.has(x.id));
+          if(extra.length) inBatches(extra,sleepPut);
+          remote.push(...extra);
+        }
+        sleeps=remote; sortSleeps(); saveSleeps(); renderSleep();
+      }, err=>{ if(!(err&&err.code==='revoked'))notify('Połączenie z pamięcią snu przerwane. Odśwież stronę.'); });
+    }
+
+    const ongoing=()=>sleeps.find(x=>!x.end);
+    const msOf=(x)=>({a:+new Date(x.start), b:x.end?+new Date(x.end):Date.now()});
+    function durText(ms) {
+      const m=Math.max(0,Math.round(ms/MIN)), h=Math.floor(m/60), r=m%60;
+      return h?`${h} h${r?` ${String(r).padStart(2,'0')} min`:''}`:`${r} min`;
+    }
+    function durInto(node,ms) {
+      node.replaceChildren();
+      const m=Math.max(0,Math.floor(ms/MIN)), h=Math.floor(m/60), r=m%60;
+      const part=(n,u)=>{ node.append(String(n)); const s=document.createElement('small'); s.textContent=u; node.append(s); };
+      if(h){ part(h,'h'); if(r) part(String(r).padStart(2,'0'),'min'); } else part(r,'min');
+    }
+    // Oś czasu: sen + przerwy między snami (czuwanie). Przed pierwszym wpisem brak danych.
+    function segments(from,to) {
+      const now=Date.now(), end=Math.min(to,now), list=sleeps.map(x=>Object.assign({id:x.id,open:!x.end},msOf(x))).sort((p,q)=>p.a-q.a);
+      const out=[]; let cur=null;
+      for(const x of list){ if(cur!==null&&x.a>cur) out.push({type:'awake',a:cur,b:x.a}); out.push(Object.assign({type:'sleep'},x)); cur=Math.max(cur===null?x.b:cur,x.b); }
+      if(cur!==null&&cur<now) out.push({type:'awake',a:cur,b:now,open:true});
+      return out.filter(x=>x.b>from&&x.a<end).map(x=>Object.assign({},x,{ca:Math.max(x.a,from),cb:Math.min(x.b,end)}));
+    }
+    function dayBounds(key) { const d=fromKey(key); d.setHours(0,0,0,0); const e=new Date(d); e.setDate(e.getDate()+1); return [d.getTime(),e.getTime()]; }
+
+    function renderSleepHero() {
+      const hero=$('sleepHero'), cap=$('sleepLabel'), big=$('sleepSince'), sub=$('sleepSub'), btn=$('sleepToggle');
+      const on=ongoing(), now=Date.now();
+      const finished=sleeps.filter(x=>x.end).sort((p,q)=>new Date(q.end)-new Date(p.end));
+      if(on) {
+        const a=new Date(on.start);
+        hero.classList.remove('awake'); cap.textContent=`Śpi od ${relativeDay(a)==='dziś'?'':relativeDay(a)+' '}${timeFmt.format(a)}`;
+        big.className='since comic'; durInto(big,now-a.getTime());
+        sub.textContent='Naciśnij Koniec snu, gdy się obudzi.';
+        btn.textContent='Koniec snu'; btn.classList.add('btn-stop');
+      } else if(finished.length) {
+        const last=finished[0], b=new Date(last.end);
+        hero.classList.add('awake'); cap.textContent=`Nie śpi od ${relativeDay(b)==='dziś'?'':relativeDay(b)+' '}${timeFmt.format(b)}`;
+        big.className='since comic'; durInto(big,now-b.getTime());
+        sub.textContent=`Ostatni sen: ${durText(b-new Date(last.start))}, ${timeFmt.format(new Date(last.start))}–${timeFmt.format(b)}.`;
+        btn.textContent='Start snu'; btn.classList.remove('btn-stop');
+      } else {
+        hero.classList.add('awake'); cap.textContent='Sen';
+        big.className='since comic empty'; big.textContent='Jeszcze nic';
+        sub.textContent='Naciśnij Start snu, gdy maluch zaśnie.';
+        btn.textContent='Start snu'; btn.classList.remove('btn-stop');
+      }
+      big.querySelectorAll('small').forEach(s=>s.className='u');
+    }
+    function renderSleepStats() {
+      const now=Date.now(), seg=segments(now-DAY,now).filter(x=>x.type==='sleep');
+      const total=seg.reduce((t,x)=>t+(x.cb-x.ca),0);
+      durInto($('sleep24'),total);
+      $('sleep24sub').textContent=seg.length?`${seg.length} ${napsWord(seg.length)}`:'Brak drzemek';
+      if(seg.length) {
+        const best=seg.reduce((m,x)=>(x.b-x.a)>(m.b-m.a)?x:m);
+        durInto($('sleepLong'),best.b-best.a);
+        $('sleepLongSub').textContent=`w 24 h: ${timeFmt.format(new Date(best.a))}–${best.open?'teraz':timeFmt.format(new Date(best.b))}`;
+      } else { $('sleepLong').textContent='—'; $('sleepLongSub').textContent=' '; }
+    }
+    function renderSleepDay() {
+      const todayKey=localKey(new Date()), [from,to]=dayBounds(sleepDay), now=Date.now();
+      $('sleepDayLabel').textContent=sleepDay===todayKey?`Dziś, ${dayMonthFmt.format(fromKey(sleepDay))}`:cap(topDateFmt.format(fromKey(sleepDay)));
+      $('sleepNext').disabled=sleepDay>=todayKey;
+      const seg=segments(from,to), bar=$('sleepBar');
+      bar.querySelectorAll('.tl-seg,.tl-now').forEach(n=>n.remove());
+      const span=to-from;
+      for(const x of seg){ const d=document.createElement('div'); d.className='tl-seg '+x.type; d.style.left=`${(x.ca-from)/span*100}%`; d.style.width=`${(x.cb-x.ca)/span*100}%`; bar.append(d); }
+      if(now>from&&now<to){ const n=document.createElement('div'); n.className='tl-now'; n.style.left=`calc(${(now-from)/span*100}% - 1.5px)`; bar.append(n); }
+      const sl=seg.filter(x=>x.type==='sleep').reduce((t,x)=>t+(x.cb-x.ca),0), aw=seg.filter(x=>x.type==='awake').reduce((t,x)=>t+(x.cb-x.ca),0);
+      $('sleepDayTotals').textContent=seg.length?`sen ${durText(sl)}, czuwanie ${durText(aw)}`:'';
+      bar.setAttribute('aria-label',seg.length?`Oś doby: sen ${durText(sl)}, czuwanie ${durText(aw)}`:'Oś doby: brak danych');
+      const log=$('sleepLog'); log.replaceChildren();
+      if(!seg.length) {
+        const e=document.createElement('div'); e.className='empty'; const t=document.createElement('strong'), p=document.createElement('p');
+        t.textContent=sleeps.length?'Brak snu w tym dniu':'Dziennik snu jest pusty';
+        p.textContent=sleeps.length?'Wybierz inny dzień strzałkami.':'Naciśnij Start snu albo dodaj sen ręcznie poniżej.';
+        e.append(t,p); log.append(e); return;
+      }
+      for(const x of seg) {
+        const row=document.createElement('div'); row.className='log-row '+x.type;
+        const time=document.createElement('div'); time.className='log-time'; time.textContent=`${timeFmt.format(new Date(x.a))}–${x.open?'teraz':timeFmt.format(new Date(x.b))}`;
+        const info=document.createElement('div'); info.className='log-info';
+        const kind=document.createElement('div'); kind.className='log-kind'; kind.textContent=x.type==='sleep'?(x.open?'Śpi':'Sen'):(x.open?'Nie śpi (teraz)':'Nie śpi');
+        const dur=document.createElement('div'); dur.className='log-dur'; dur.textContent=durText(x.b-x.a);
+        info.append(kind,dur);
+        if(x.a<from||x.b>to){ const n=document.createElement('div'); n.className='log-note'; n.textContent=`${x.a<from?`od ${relativeDay(new Date(x.a))}`:`do ${x.open?'teraz':relativeDay(new Date(x.b))}`}, w tym dniu ${durText(x.cb-x.ca)}`; info.append(n); }
+        row.append(time,info);
+        if(x.type==='sleep') {
+          const act=document.createElement('div'); act.className='feed-actions';
+          const ed=document.createElement('button'); ed.type='button'; ed.className='icon-btn'; ed.innerHTML=svgIcon('edit'); ed.setAttribute('aria-label',`Edytuj sen ${time.textContent}`); ed.addEventListener('click',()=>beginSleepEdit(x.id));
+          const de=document.createElement('button'); de.type='button'; de.className='icon-btn del'; de.innerHTML=svgIcon('delete'); de.setAttribute('aria-label',`Usuń sen ${time.textContent}`); de.addEventListener('click',()=>deleteSleep(x.id));
+          act.append(ed,de); row.append(act);
+        }
+        log.append(row);
+      }
+    }
+    function renderSleep() { renderSleepHero(); renderSleepStats(); renderSleepDay(); }
+
+    async function toggleSleep() {
+      const on=ongoing(), now=new Date(); now.setSeconds(0,0);
+      if(on) {
+        const end=Math.max(now.getTime(),new Date(on.start).getTime()+MIN);
+        const item={id:on.id,start:on.start,end:new Date(end).toISOString()};
+        sleeps=sleeps.map(x=>x.id===on.id?item:x); saveSleeps(); sleepDay=localKey(new Date()); renderSleep();
+        notify(`Koniec snu: ${durText(end-new Date(on.start))}`); sleepPut(item);
+      } else {
+        const item={id:makeId(),start:now.toISOString(),end:null};
+        sleeps.push(item); sortSleeps(); saveSleeps(); sleepDay=localKey(new Date()); renderSleep();
+        notify('Start snu'); sleepPut(item);
+      }
+    }
+    function resetSleepForm() {
+      sleepEditId=null; $('sleepError').textContent='';
+      const end=new Date(); end.setSeconds(0,0); const start=new Date(end.getTime()-HOUR);
+      $('sleepStart').value=dateTimeLocal(start); $('sleepEnd').value=dateTimeLocal(end);
+      $('sleepFormTitle').textContent='Dodaj sen ręcznie'; $('sleepSubmit').textContent='Zapisz sen'; $('sleepCancel').hidden=true; $('sleepEndHint').hidden=true;
+    }
+    function beginSleepEdit(id) {
+      const x=sleeps.find(y=>y.id===id); if(!x)return;
+      sleepEditId=id; $('sleepError').textContent='';
+      $('sleepStart').value=dateTimeLocal(new Date(x.start)); $('sleepEnd').value=x.end?dateTimeLocal(new Date(x.end)):'';
+      $('sleepEndHint').hidden=!!x.end;
+      $('sleepFormTitle').textContent='Edytuj sen'; $('sleepSubmit').textContent='Zapisz zmiany'; $('sleepCancel').hidden=false;
+      $('sleepPanel').scrollIntoView({behavior:'smooth',block:'start'});
+    }
+    async function deleteSleep(id) {
+      const x=sleeps.find(y=>y.id===id); if(!x)return;
+      const a=new Date(x.start);
+      if(!await ask('Usunąć sen?',`${relativeDay(a)} ${timeFmt.format(a)}–${x.end?timeFmt.format(new Date(x.end)):'teraz'}.`,'Usuń'))return;
+      sleeps=sleeps.filter(y=>y.id!==id); saveSleeps(); if(id===sleepEditId)resetSleepForm(); renderSleep(); notify('Usunięto sen'); sleepDel(id);
+    }
+    function submitSleep(ev) {
+      ev.preventDefault(); const err=$('sleepError'); err.textContent='';
+      const a=new Date($('sleepStart').value), endRaw=$('sleepEnd').value, now=Date.now();
+      const editing=sleepEditId?sleeps.find(y=>y.id===sleepEditId):null;
+      const keepOpen=!endRaw&&editing&&!editing.end;
+      const b=keepOpen?null:new Date(endRaw);
+      if(!Number.isFinite(a.getTime())){ err.textContent='Wybierz początek snu.'; return; }
+      if(!keepOpen&&!Number.isFinite(b.getTime())){ err.textContent='Wybierz koniec snu.'; return; }
+      if(a.getTime()>now+5*MIN||(b&&b.getTime()>now+5*MIN)){ err.textContent='Ta godzina jest w przyszłości. Wybierz wcześniejszą.'; return; }
+      if(b&&b<=a){ err.textContent='Koniec snu musi być po jego początku.'; return; }
+      if(b&&b-a>24*HOUR){ err.textContent='Sen nie może trwać dłużej niż 24 godziny.'; return; }
+      const A=a.getTime(), B=b?b.getTime():now;
+      const clash=sleeps.find(y=>y.id!==sleepEditId&&(()=>{ const m=msOf(y); return A<m.b&&B>m.a; })());
+      if(clash){ const m=msOf(clash); err.textContent=`Ten czas nachodzi na sen ${timeFmt.format(new Date(m.a))}–${clash.end?timeFmt.format(new Date(m.b)):'teraz'}. Popraw godziny albo edytuj tamten wpis.`; return; }
+      if(keepOpen&&sleeps.some(y=>!y.end&&y.id!==sleepEditId)){ err.textContent='Inny sen nadal trwa.'; return; }
+      const item={id:sleepEditId||makeId(),start:a.toISOString(),end:b?b.toISOString():null};
+      if(editing) sleeps=sleeps.map(y=>y.id===item.id?item:y); else sleeps.push(item);
+      sortSleeps(); if(!saveSleeps())return;
+      sleepDay=localKey(a); const was=!!editing; resetSleepForm(); renderSleep();
+      notify(was?'Zapisano zmiany':'Zapisano sen'); sleepPut(item);
+    }
+
+    // ---------- Zakładki ----------
+    function showView(name,push) {
+      const sleep=name==='sen';
+      $('viewFeed').hidden=sleep; $('viewSleep').hidden=!sleep;
+      $('tabFeed').setAttribute('aria-selected',String(!sleep)); $('tabSleep').setAttribute('aria-selected',String(sleep));
+      if(sleep) renderSleep();
+      try { localStorage.setItem(VIEW_KEY,name); } catch(e) {}
+      if(push) { try { history.replaceState(null,'','#'+name); } catch(e) {} }
     }
 
     // ---------- Zegar ----------
@@ -592,9 +1162,12 @@
       syncNow();
       if(todayKey!==lastRenderedToday) {
         const following=selectedDate===lastRenderedToday&&weekOffset===0;
-        lastRenderedToday=todayKey; if(following)selectedDate=todayKey; renderAll();
+        lastRenderedToday=todayKey; if(following)selectedDate=todayKey;
+        if(sleepDay===localKey(new Date(Date.now()-DAY)))sleepDay=todayKey;
+        renderAll(); renderSleep();
       } else if(Math.floor(Date.now()/MIN)!==lastRenderedMinute) {
         renderStats(); if(historyMode==='24h')renderHistory();
+        renderSleep();
       }
     }
 
@@ -615,13 +1188,45 @@
     $('importFile').addEventListener('change',e=>importJSON(e.target));
     $('resetAll').addEventListener('click',clearAll);
     $('themeBtn').addEventListener('click',()=>setTheme(THEMES[currentTheme()].next));
-    window.addEventListener('storage',e=>{ if(e.key===STORE){ load(); renderAll(); } });
+    window.addEventListener('storage',e=>{ if(!db&&e.key===STORE){ load(); renderAll(); } });
+    $('askNo').addEventListener('click',()=>closeAsk(false));
+    $('askYes').addEventListener('click',()=>closeAsk(true));
+    $('askScrim').addEventListener('click',e=>{ if(e.target===$('askScrim'))closeAsk(false); });
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&!$('askScrim').hidden)closeAsk(false); });
     document.addEventListener('visibilitychange',()=>{ if(!document.hidden)refreshClock(); });
     window.addEventListener('pageshow',refreshClock);
     window.addEventListener('focus',refreshClock);
     setInterval(()=>{ if(!document.hidden)refreshClock(); },10000);
 
-    renderThemeBtn(); load(); resetForm(); renderAll();
+    $('tabFeed').addEventListener('click',()=>showView('karmienie',true));
+    $('tabSleep').addEventListener('click',()=>showView('sen',true));
+    $('sleepToggle').addEventListener('click',toggleSleep);
+    $('sleepForm').addEventListener('submit',submitSleep);
+    $('sleepCancel').addEventListener('click',resetSleepForm);
+    $('sleepPrev').addEventListener('click',()=>{ sleepDay=localKey(shiftDate(fromKey(sleepDay),-1)); renderSleepDay(); });
+    $('sleepNext').addEventListener('click',()=>{ if(sleepDay<localKey(new Date())){ sleepDay=localKey(shiftDate(fromKey(sleepDay),1)); renderSleepDay(); } });
+    document.querySelectorAll('[data-dur]').forEach(b=>b.addEventListener('click',()=>{
+      const a=new Date($('sleepStart').value); if(!Number.isFinite(a.getTime()))return;
+      $('sleepEnd').value=dateTimeLocal(new Date(a.getTime()+Number(b.dataset.dur)*MIN)); $('sleepError').textContent='';
+    }));
+    window.addEventListener('storage',e=>{ if(!db&&e.key===SLEEP_STORE){ loadSleeps(); renderSleep(); } });
+
+    $('syncCreate').addEventListener('click',()=>startFamily(newCode(),true));
+    $('syncJoin').addEventListener('submit',e=>{
+      e.preventDefault(); const code=normCode($('syncInput').value);
+      if(code.length!==12) { $('syncError').textContent='Kod ma 12 znaków: litery i cyfry.'; $('syncInput').focus(); return; }
+      startFamily(code,false);
+    });
+    $('syncShare').addEventListener('click',shareCode);
+    $('syncNow').addEventListener('click',()=>{ if(fam){ syncStatus('busy'); fam.syncNow(); } });
+    $('syncLeave').addEventListener('click',leaveFamily);
+    // Po powrocie do aplikacji od razu pobierz zmiany drugiej osoby.
+    document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&fam)fam.syncNow(); });
+    window.addEventListener('online',()=>{ if(fam)fam.syncNow(); });
+
+    renderThemeBtn(); load(); loadSleeps(); resetForm(); resetSleepForm(); renderAll(); renderSleep();
+    (function(){ let v=(location.hash||'').slice(1); if(v!=='sen'&&v!=='karmienie'){ try { v=localStorage.getItem(VIEW_KEY)||''; } catch(e) { v=''; } } showView(v==='sen'?'sen':'karmienie',false); })();
+    connect();
     if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
       window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
     }
