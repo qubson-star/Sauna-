@@ -1,6 +1,12 @@
-# Statyczna strona, bez budowania — publikujemy katalog główny.
+# Na Netlify: aplikacja (pliki z katalogu głównego kopiowane do dist/) + funkcja do wspólnych danych.
+# Na GitHub Pages ten plik nie ma znaczenia — tam strona idzie prosto z katalogu głównego.
 [build]
-  publish = "."
+  command = "mkdir -p dist && cp index.html sw.js manifest.webmanifest favicon.svg *.png dist/ && cp -r licencje-fontow dist/"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "22"
 
 # Service worker i strona zawsze świeże, żeby aktualizacje docierały na telefon.
 [[headers]]
@@ -10,5 +16,10 @@
 
 [[headers]]
   for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/"
   [headers.values]
     Cache-Control = "no-cache"
